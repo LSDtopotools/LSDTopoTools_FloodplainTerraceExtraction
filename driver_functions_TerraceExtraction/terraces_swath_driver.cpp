@@ -68,7 +68,8 @@ int main (int nNumberofArgs,char *argv[])
 	int_default_map["Slope lower percentile"] = 25;
 	int_default_map["Slope upper percentile"] = 75;
 	int_default_map["Min patch size"] = 1000;
-	int_default_map["Search distance"] = 10;
+	int_default_map["search_radius"] = 10;
+	int_default_map["NormaliseToBaseline"] = 0;
 
 	// set default float parameters
 	float_default_map["surface_fitting_window_radius"] = 6;
@@ -185,8 +186,7 @@ int main (int nNumberofArgs,char *argv[])
 	  LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
 
 		cout << "\n\t Getting raster from swath" << endl;
-		int NormaliseToBaseline = 1;
-		LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, NormaliseToBaseline);
+		LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
 		string swath_ext = "_swath_raster";
 		SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
@@ -223,7 +223,7 @@ int main (int nNumberofArgs,char *argv[])
 		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
 
 		cout << "\t Testing connected components" << endl;
-		vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, NormaliseToBaseline);
+		vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
 
 		// push back results to file for plotting
 		ofstream output_file_CC;
