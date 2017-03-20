@@ -1,6 +1,6 @@
 *.o
 *.out
-build/CMakeCache.txt
-build/CMakeFiles/*
-build/Makefile
-build/cmake_install.cmake
+driver_functions_TerraceExtraction/build/CMakeCache.txt
+driver_functions_TerraceExtraction/build/CMakeFiles/*
+driver_functions_TerraceExtraction/build/Makefile
+driver_functions_TerraceExtraction/build/cmake_install.cmake
