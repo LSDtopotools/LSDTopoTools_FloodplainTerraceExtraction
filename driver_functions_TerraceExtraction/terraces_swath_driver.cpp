@@ -69,7 +69,7 @@ int main (int nNumberofArgs,char *argv[])
 	int_default_map["Slope upper percentile"] = 75;
 	int_default_map["Min patch size"] = 1000;
 	int_default_map["search_radius"] = 10;
-	int_default_map["NormaliseToBaseline"] = 0;
+	int_default_map["NormaliseToBaseline"] = 1;
 
 	// set default float parameters
 	float_default_map["surface_fitting_window_radius"] = 6;
