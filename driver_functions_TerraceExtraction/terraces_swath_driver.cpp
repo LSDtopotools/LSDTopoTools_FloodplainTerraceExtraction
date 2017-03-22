@@ -108,6 +108,18 @@ int main (int nNumberofArgs,char *argv[])
 	vector<string> boundary_conditions = LSDPP.get_boundary_conditions();
 	string CHeads_file = LSDPP.get_CHeads_file();
 
+	// some error checking
+	if (CHeads_file.empty())
+	{
+		cout << "FATAL ERROR: I can't find your channel heads file. Check your spelling!! \n The parameter key needs to be 'channel heads fname'" << endl;
+		exit(EXIT_SUCCESS);
+	}
+	if (this_string_map["coords_csv_file"] == "NULL")
+	{
+		cout << "FATAL ERROR: I can't find your coordinates file. Check your spelling!! \n The parameter key needs to be 'coords_csv_file'" << endl;
+		exit(EXIT_SUCCESS);
+	}
+
   cout << "starting the test run... here we go!" << endl;
 
 	LSDRaster RasterTemplate;
