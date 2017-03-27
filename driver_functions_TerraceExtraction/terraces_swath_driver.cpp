@@ -157,7 +157,7 @@ int main (int nNumberofArgs,char *argv[])
 	// calcualte the distance from outlet
 	LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 	// load the sources
-	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv", 2);
+	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 0);
 	cout << "\t Got sources!" << endl;
 
 	// now get the junction network

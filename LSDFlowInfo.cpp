@@ -1449,6 +1449,196 @@ void LSDFlowInfo::unpickle(string filename)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//
+// SCRIPTS FOR LOADING CSV DATA
+// ported from LSDSpatialCSVReader
+// FJC 23/03/17
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This loads a csv file
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+map<string, vector<string> > LSDFlowInfo::load_csv_data(string filename)
+{
+  // make sure the filename works
+  ifstream ifs(filename.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv file, but the file" << filename
+         << "doesn't exist; check your filename" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "I have opened the csv file." << endl;
+  }
+
+  // Initiate the data map
+  map<string, vector<string> > data_map;
+
+  map<string, int > temp_vec_vec_key;
+  vector< vector<string> > temp_vec_vec;
+  map<string, vector<string> > temp_data_map;
+
+  // << "Data map size is: " << data_map.size() << endl;
+  //cout << "longitude size is: " << longitude.size() << endl;
+
+  // initiate the string to hold the file
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+
+  // get the headers from the first line
+  getline(ifs, line_from_file);
+
+  // reset the string vec
+  this_string_vec = empty_string_vec;
+
+  // create a stringstream
+  stringstream ss(line_from_file);
+  ss.precision(9);
+
+  while( ss.good() )
+  {
+    string substr;
+    getline( ss, substr, ',' );
+
+    // remove the spaces
+    substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+    // remove control characters
+    substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+    // add the string to the string vec
+    this_string_vec.push_back( substr );
+  }
+  // now check the data map
+  int n_headers = int(this_string_vec.size());
+  vector<string> header_vector = this_string_vec;
+  for (int i = 0; i<n_headers; i++)
+  {
+    temp_data_map[header_vector[i]] = empty_string_vec;
+  }
+
+  // now loop through the rest of the lines, getting the data.
+  while( getline(ifs, line_from_file))
+  {
+    //cout << "Getting line, it is: " << line_from_file << endl;
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+
+    // create a stringstream
+    stringstream ss(line_from_file);
+
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+
+    //cout << "Yoyoma! size of the string vec: " <<  this_string_vec.size() << endl;
+    if ( int(this_string_vec.size()) <= 0)
+    {
+      cout << "Hey there, I am trying to load your csv data but you seem not to have" << endl;
+      cout << "enough columns in your file. I am ignoring a line" << endl;
+    }
+    else
+    {
+      int n_cols = int(this_string_vec.size());
+      //cout << "N cols is: " << n_cols << endl;
+      for (int i = 0; i<n_cols; i++)
+      {
+        temp_data_map[header_vector[i]].push_back(this_string_vec[i]);
+      }
+      //cout << "Done with this line." << endl;
+    }
+
+  }
+  
+
+
+  data_map = temp_data_map;
+
+  cout << "I loaded a csv with the keys: " << endl;
+  for( map<string, vector<string> >::iterator it = data_map.begin(); it != data_map.end(); ++it)
+  {
+    cout << "Key is: " <<it->first << "\n";
+  }
+  
+  return data_map;
+
+}
+//==============================================================================
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This returns the string vector of data from a given column name
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<string> LSDFlowInfo::get_data_column(string column_name, map<string, vector<string> > data_map)
+{
+  vector<string> data_vector;
+  if ( data_map.find(column_name) == data_map.end() )
+  {
+    // not found
+    cout << "I'm afraid the column "<< column_name << " is not in this dataset" << endl;
+  }
+  else
+  {
+    data_vector = data_map[column_name];
+  }
+  return data_vector;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Converts a data column to a float vector
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDFlowInfo::data_column_to_float(string column_name, map<string, vector<string> > data_map)
+{
+  vector<string> string_vec = get_data_column(column_name, data_map);
+  vector<float> float_vec;
+  int N_data_elements = string_vec.size();
+  for(int i = 0; i<N_data_elements; i++)
+  {
+    float_vec.push_back( atof(string_vec[i].c_str()));
+  }
+  return float_vec;
+}
+
+// Converts a data column to a float vector
+vector<int> LSDFlowInfo::data_column_to_int(string column_name, map<string, vector<string> > data_map)
+{
+  vector<string> string_vec = get_data_column(column_name, data_map);
+  vector<int> int_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+    int_vec.push_back( atoi(string_vec[i].c_str()));
+  }
+  return int_vec;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// END OF CSV FUNCTIONS
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to ingest the channel heads raster generated using channel_heads_driver.cpp
@@ -1479,40 +1669,42 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads(string filename, string extension,
 
   // if this is a csv file, read its contents directly into the node index vector
   if(extension == "csv")
+  {
+    if(input_switch != 0 && input_switch != 1 && input_switch != 2)
     {
-      if(input_switch != 0 && input_switch != 1 && input_switch != 2)
-  {
-    cout << "\t Note, you have specified an unsupported value for the input switch.  Note: \n\t\t 0=take node index\n\t\t 1=take row and column indices\n\t\t 2=take x and y coordinates"  << endl;
-    cout << "\t ...taking node index by default" << endl;
-  }
-      ifstream ch_csv_in;
-      string fname = filename +"."+extension;
-      ch_csv_in.open(fname.c_str());
+      cout << "\t Note, you have specified an unsupported value for the input switch.  Note: \n\t\t 0=take node index\n\t\t 1=take row and column indices\n\t\t 2=take x and y coordinates"  << endl;
+      cout << "\t ...taking node index by default" << endl;
+    }
+    ifstream ch_csv_in;
+    string fname = filename +"."+extension;
+    ch_csv_in.open(fname.c_str());
 
-      if(not ch_csv_in.good())
-  {
-    cout << "Hey DUDE, you are trying to ingest a sources file that doesn't exist!!" << endl;
-    cout << fname << endl;
-    cout << "Check your filename" << endl;
-    exit(EXIT_FAILURE);
-  }
+    if(not ch_csv_in.good())
+    {
+      cout << "You are trying to ingest a sources file that doesn't exist!!" << endl;
+      cout << fname << endl;
+      cout << "Check your filename" << endl;
+      exit(EXIT_FAILURE);
+    }
 
-      cout << "fname is: " << fname << endl;
+    cout << "fname is: " << fname << endl;
 
-      string sline = "";
-      getline(ch_csv_in,sline);
+    string sline = "";
+    getline(ch_csv_in,sline);
 
-      vector<int> nodeindex,rowindex,colindex;
-      vector<float> x_coord,y_coord;
-      while(!ch_csv_in.eof())
-  {
-    char name[256];
-    ch_csv_in.getline(name,256);
-    sline = name;
+    vector<int> nodeindex,rowindex,colindex;
+    vector<float> x_coord,y_coord;
+    
+    // TODO This needs to be rplaced with the csv reader!!!
+    while(!ch_csv_in.eof())
+    {
+      char name[256];
+      ch_csv_in.getline(name,256);
+      sline = name;
 
-    // a very tedious way to get the right bit of data. There is probably a
-    // better way to do this but this way works
-    if (sline.size() > 0)
+      // a very tedious way to get the right bit of data. There is probably a
+      // better way to do this but this way works
+      if (sline.size() > 0)
       {
         // column index
         string prefix = sline.substr(0,sline.size());
@@ -1540,82 +1732,199 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads(string filename, string extension,
         suffix = prefix.substr(comma+1,prefix.size());
         x_coord.push_back(atof(suffix.c_str()));
       }
-  }
-      int node;
-      // use row and column indices to locate source nodes.
-      if(input_switch == 1)
-  {
-    for(int i = 0; i < int(rowindex.size()); ++i)
+    }
+    int node;
+    // use row and column indices to locate source nodes.
+    if(input_switch == 1)
+    {
+      for(int i = 0; i < int(rowindex.size()); ++i)
       {
         if(rowindex[i]<NRows && rowindex[i]>=0 && colindex[i]<NCols && colindex[i] >=0 && NodeIndex[rowindex[i]][colindex[i]]!=NoDataValue)
-    {
-      node = retrieve_node_from_row_and_column(rowindex[i],colindex[i]);
-      Sources.push_back(node);
-    }
+        {
+          node = retrieve_node_from_row_and_column(rowindex[i],colindex[i]);
+          Sources.push_back(node);
+        }
       }
-  }
-      // Use coordinates to locate source nodes. Note that this enables the use
-      // of LiDAR derived channel heads in coarser DEMs of the same area or
-      // subsets of the original DEM for more efficient processing.
-      else if(input_switch == 2)
-  {
-    vector<int> Sources_temp;
-    int N_coords = x_coord.size();
-    int N_sources_1 = 0;
-    for(int i = 0; i < N_coords; ++i)
+    }
+    // Use coordinates to locate source nodes. Note that this enables the use
+    // of LiDAR derived channel heads in coarser DEMs of the same area or
+    // subsets of the original DEM for more efficient processing.
+    else if(input_switch == 2)
+    {
+      vector<int> Sources_temp;
+      int N_coords = x_coord.size();
+      int N_sources_1 = 0;
+      for(int i = 0; i < N_coords; ++i)
       {
         node = get_node_index_of_coordinate_point(x_coord[i], y_coord[i]);
         if (node != NoDataValue)
-    {
-      // Test 1 - Check for channel heads that fall in same pixel
-      int test1 = 0;
-      N_sources_1 = Sources_temp.size();
-      for(int i_test=0; i_test<N_sources_1;++i_test)
         {
-          if(node==Sources_temp[i_test]) test1 = 1;
+          // Test 1 - Check for channel heads that fall in same pixel
+          int test1 = 0;
+          N_sources_1 = Sources_temp.size();
+          for(int i_test=0; i_test<N_sources_1;++i_test)
+          {
+            if(node==Sources_temp[i_test]) test1 = 1;
+          }
+          if(test1==0) Sources_temp.push_back(node);
+          else cout << "\t\t ! removed node from sources list - coincident with another source node" << endl;
         }
-      if(test1==0) Sources_temp.push_back(node);
-      else cout << "\t\t ! removed node from sources list - coincident with another source node" << endl;
-    }
       }
-    // Test 2 - Need to do some extra checks to load sources correctly.
-    int N_sources_2 = Sources_temp.size();
-    for(int i = 0; i<N_sources_2; ++i)
+      // Test 2 - Need to do some extra checks to load sources correctly.
+      int N_sources_2 = Sources_temp.size();
+      for(int i = 0; i<N_sources_2; ++i)
       {
         int test2 = 0;
         for(int i_test = 0; i_test<int(Sources_temp.size()); ++i_test)
-    {
-      if(i!=i_test)
         {
-          if(is_node_upstream(Sources_temp[i],Sources_temp[i_test])==true) test2 = 1;
+          if(i!=i_test)
+          {
+            if(is_node_upstream(Sources_temp[i],Sources_temp[i_test])==true) test2 = 1;
+          }
         }
-    }
         if(test2 ==0) Sources.push_back(Sources_temp[i]);
         else cout << "\t\t ! removed node from sources list - other sources upstream" << endl;
       }
-  }
-      // Using Node Index directly (default)
-      else Sources = nodeindex;
-
     }
+    // Using Node Index directly (default)
+    else Sources = nodeindex;
+
+  }
 
   // if not the code assums a sources raster.
   else
-    {
-      LSDIndexRaster CHeads(filename, extension);
+  {
+    LSDIndexRaster CHeads(filename, extension);
 
-      for (int i = 0; i < NRows; ++i){
-  for (int j = 0; j < NCols; ++j){
-    if (CHeads.get_data_element(i,j) != NoDataValue){
-      CH_node = retrieve_node_from_row_and_column(i,j);
-			//cout << "Row: " << i << " Col: " << j << endl;
-      if (CH_node != NoDataValue){
-        Sources.push_back(CH_node);
+    for (int i = 0; i < NRows; ++i)
+    {
+      for (int j = 0; j < NCols; ++j)
+      {
+        if (CHeads.get_data_element(i,j) != NoDataValue)
+        {
+          CH_node = retrieve_node_from_row_and_column(i,j);
+          if (CH_node != NoDataValue)
+          {
+            Sources.push_back(CH_node);
+          }
+        }
       }
     }
   }
+  return Sources;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Method to ingest the channel heads raster generated using channel_heads_driver.cpp
+// into a vector of source nodes so that an LSDJunctionNetwork can be created easily
+// from them. Assumes the FlowInfo object has the same dimensions as the channel
+// heads raster.
+//
+// Takes the filename and extension of the channel heads raster.
+//
+// SWDG 05/12/12
+//
+// Update: 6/6/14 Happy 3rd birthday Skye!!!!
+// SMM
+// Now if the file extension is "csv" then the script reads a csv channel heads
+// file
+//
+// Update 30/09/14 Altered structure of function, but key difference is that it
+// is now much better in how it goes about reading in channel heads using
+// the coordinates, so that channel heads for a region determined usiong one DEM
+// can be loaded in to another covering a subsample of the area, or a different
+// resolution, which was impossible before.
+// DTM
+//
+// *******************************************************************************************
+// UPDATE 23/03/17 - NEW OVERLOADED CHANNEL HEADS INGESTION ROUTINE.  This ONLY works with the
+// csv file as this seems to be the best way of reading in the channel heads. Other formats
+// should now be obsolete.
+// Finds the appropriate column from the csv based on the string of the heading rather
+// than by column number, so should work with different versions of the output sources
+// csv file.
+//
+// Input switch tells what the columns the code should be looking for:
+// 0 - use the node index
+// 1 - use rows and columns
+// 2 - use x and y (UTM coordinates)
+
+// Could add in a 3rd switch for lat long but this requires a bunch of extra porting that
+// I can't be bothered to do right now.
+// FJC
+// *****************************************************************************************
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDFlowInfo::Ingest_Channel_Heads(string filename, int input_switch)
+{
+  vector<int> Sources;
+  int CH_node;
+
+  // load the csv file
+  map<string, vector<string> > data_map = load_csv_data(filename+".csv");
+
+  // now check the input switch to search for the various columns
+  if (input_switch == 0)
+  {
+    // use the node index
+    vector<int> NodeIndices = data_column_to_int("node", data_map);
+    Sources = NodeIndices;
+  }
+  else if (input_switch == 1)
+  {
+    // use the rows and columns
+    vector<int> rows = data_column_to_int("row", data_map);
+    vector<int> cols = data_column_to_int("col", data_map);
+    for (int i = 0; i < int(rows.size()); i++)
+    {
+      int NI = retrieve_node_from_row_and_column(rows[i], cols[i]);
+      Sources.push_back(NI);
+    }
+  }
+  else if (input_switch == 2)
+  {
+    // use x and y (UTM coordinates)
+    vector<float> x_coord = data_column_to_float("x", data_map);
+    vector<float> y_coord = data_column_to_float("y", data_map);
+    int N_coords = x_coord.size();
+
+    vector<int> Sources_temp;
+    int N_sources_1 = 0;
+    for(int i = 0; i < N_coords; ++i)
+    {
+      int node = get_node_index_of_coordinate_point(x_coord[i], y_coord[i]);
+      if (node != NoDataValue)
+      {
+        // Test 1 - Check for channel heads that fall in same pixel
+        int test1 = 0;
+        N_sources_1 = Sources_temp.size();
+        for(int i_test=0; i_test<N_sources_1;++i_test)
+        {
+          if(node==Sources_temp[i_test]) test1 = 1;
+        }
+        if(test1==0) Sources_temp.push_back(node);
+        else cout << "\t\t ! removed node from sources list - coincident with another source node" << endl;
       }
     }
+    // Test 2 - Need to do some extra checks to load sources correctly.
+    int N_sources_2 = Sources_temp.size();
+    for(int i = 0; i<N_sources_2; ++i)
+    {
+      int test2 = 0;
+      for(int i_test = 0; i_test<int(Sources_temp.size()); ++i_test)
+      {
+        if(i!=i_test)
+        {
+          if(is_node_upstream(Sources_temp[i],Sources_temp[i_test])==true) test2 = 1;
+        }
+      }
+      if(test2 ==0) Sources.push_back(Sources_temp[i]);
+      else cout << "\t\t ! removed node from sources list - other sources upstream" << endl;
+    }
+  }
+  else
+  {
+    cout << "You have not supplied a valid input switch! Please supply either 0, 1, or 2." << endl;
+  }
   return Sources;
 }
 
@@ -4114,105 +4423,113 @@ vector< Array2D<float> > LSDFlowInfo::HilltopFlowRouting(LSDRaster Elevation, LS
   }
 
   // cycle through study area, find hilltops and trace downstream
-  for (i=1; i<NRows-1; ++i) {
+  for (i=1; i<NRows-1; ++i) 
+  {
     cout << flush <<  "\tRow: " << i << " of = " << NRows-1 << "              \r";
-    for (j=1; j<NCols-1; ++j) {
+    for (j=1; j<NCols-1; ++j) 
+    {
 
       // ignore edge cells and non-hilltop cells
       // route initial node by aspect and get outlet coordinates
       if (hilltops[i][j] != NoDataValue) {
 
-  length = 0;
-  flag = true;
-  count = 1;
-  path = blank.copy();
-        DivergentCountFlag = 0; //initialise count of divergent cells in trace
-        PlanarCountFlag = 0;
-        skip_trace = false; //initialise skip trace flag as false, will only be switched if no path to stream can be found. Very rare.
+      length = 0;
+      flag = true;
+      count = 1;
+      path = blank.copy();
+      DivergentCountFlag = 0; //initialise count of divergent cells in trace
+      PlanarCountFlag = 0;
+      skip_trace = false; //initialise skip trace flag as false, will only be switched if no path to stream can be found. Very rare.
 
-        E_Star = 0;
-        R_Star = 0;
-        EucDist = 0;
+      E_Star = 0;
+      R_Star = 0;
+      EucDist = 0;
 
-  ++ht_count;
+      ++ht_count;
 
-  degs = aspect[i][j];
-  theta = rads[i][j];
-  a = i;
-  b = j;
-  path[a][b] += 1;
-  east_vec[0] = easting[b];
-  north_vec[0] = northing[a];
-  s_local = slope[a][b];
+      degs = aspect[i][j];
+      theta = rads[i][j];
+      a = i;
+      b = j;
+      path[a][b] += 1;
+      east_vec[0] = easting[b];
+      north_vec[0] = northing[a];
+      s_local = slope[a][b];
 
-  //test direction, calculate outlet coordinates and update indicies
-  // easterly
-  if (degs >= 45 && degs < 135) {
-    //cout << "\neasterly" << endl;
-    xo = 1, yo = (1+tan(theta))/2;
-    d = abs(1/(2*cos(theta)));
-    xi = 0, yi = yo;
-    dir = 1;
-    east_vec[count] = easting[b] + 0.5*DataResolution;
-    north_vec[count] = northing[a] + yo - 0.5*DataResolution;
-    ++b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
-  }
-  //southerly
-  else if (degs >= 135 && degs < 225) {
-    //cout << "\nsoutherly" << endl;
-    xo = (1-(1/tan(theta)))/2, yo = 0;
-    d = abs(1/(2*cos((PI/2)-theta)));
-    xi = xo, yi = 1;
-    dir = 2;
-    east_vec[count] = easting[b] + xo - 0.5*DataResolution;
-    north_vec[count] = northing[a] - 0.5*DataResolution;
-    ++a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
-  }
-  // westerly
-  else if (degs >= 225 && degs < 315) {
-    xo = 0, yo = (1-tan(theta))/2;
-    d = abs(1/(2*cos(theta)));
-    xi = 1,  yi = yo;
-    dir = 3;
-    east_vec[count] = easting[b] -0.5*DataResolution;
-    north_vec[count] = northing[a] + yo - 0.5*DataResolution;
-    --b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
-  }
-  //northerly
-  else if (degs >= 315 || degs < 45) {
-    xo = (1+(1/tan(theta)))/2, yo = 1;
-    d = abs(1/(2*cos((PI/2) - theta)));
-    xi = xo, yi = 0;
-    dir = 4;
-    east_vec[count] = easting[b] + xo - 0.5*DataResolution;
-    north_vec[count] = northing[a] + 0.5*DataResolution;
-    --a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
-  }
-  else {
-    cout << "FATAL ERROR, Kinematic routing algorithm enountered null aspect value" << endl;
-    exit(EXIT_FAILURE);
-  }
+      //test direction, calculate outlet coordinates and update indicies
+      // easterly
+      if (degs >= 45 && degs < 135) 
+      {
+        //cout << "\neasterly" << endl;
+        xo = 1, yo = (1+tan(theta))/2;
+        d = abs(1/(2*cos(theta)));
+        xi = 0, yi = yo;
+        dir = 1;
+        east_vec[count] = easting[b] + 0.5*DataResolution;
+        north_vec[count] = northing[a] + yo - 0.5*DataResolution;
+        ++b;
+        if (yi == 0) yi = 0.00001;
+        else if (yi == 1) yi = 1 - 0.00001;
+      }
+      //southerly
+      else if (degs >= 135 && degs < 225) 
+      {
+        //cout << "\nsoutherly" << endl;
+        xo = (1-(1/tan(theta)))/2, yo = 0;
+        d = abs(1/(2*cos((PI/2)-theta)));
+        xi = xo, yi = 1;
+        dir = 2;
+        east_vec[count] = easting[b] + xo - 0.5*DataResolution;
+        north_vec[count] = northing[a] - 0.5*DataResolution;
+        ++a;
+        if (xi == 0) xi = 0.00001;
+        else if (xi == 1) xi = 1 - 0.00001;
+      }
+      // westerly
+      else if (degs >= 225 && degs < 315) 
+      {
+        xo = 0, yo = (1-tan(theta))/2;
+        d = abs(1/(2*cos(theta)));
+        xi = 1,  yi = yo;
+        dir = 3;
+        east_vec[count] = easting[b] -0.5*DataResolution;
+        north_vec[count] = northing[a] + yo - 0.5*DataResolution;
+        --b;
+        if (yi == 0) yi = 0.00001;
+        else if (yi == 1) yi = 1 - 0.00001;
+      }
+      //northerly
+      else if (degs >= 315 || degs < 45) 
+      {
+        xo = (1+(1/tan(theta)))/2, yo = 1;
+        d = abs(1/(2*cos((PI/2) - theta)));
+        xi = xo, yi = 0;
+        dir = 4;
+        east_vec[count] = easting[b] + xo - 0.5*DataResolution;
+        north_vec[count] = northing[a] + 0.5*DataResolution;
+        --a;
+        if (xi == 0) xi = 0.00001;
+        else if (xi == 1) xi = 1 - 0.00001;
+      }
+      else 
+      {
+        cout << "FATAL ERROR, Kinematic routing algorithm enountered null aspect value" << endl;
+        exit(EXIT_FAILURE);
+      }
 
-  //collect slopes and totals weighted by path length
-  length += d;
-  s_local = slope[a][b];
+      //collect slopes and totals weighted by path length
+      length += d;
+      s_local = slope[a][b];
 
-  //continue trace until a stream node is encountered
-  while (flag == true && a > 0 && a < NRows-1 && b > 0 && b < NCols-1) {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+      //continue trace until a stream node is encountered
+      while (flag == true && a > 0 && a < NRows-1 && b > 0 && b < NCols-1)
+      {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
 
-    path[a][b] += 1;
+        path[a][b] += 1;
 
-    degs_new = aspect[a][b];
-    theta = rads[a][b];
-          ++count;
+        degs_new = aspect[a][b];
+        theta = rads[a][b];
+        ++count;
 
     //Test for perimeter flow paths
     if ((dir == 1 && degs_new > 0 && degs_new < 180)

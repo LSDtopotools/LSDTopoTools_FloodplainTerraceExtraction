@@ -408,6 +408,35 @@ class LSDFlowInfo
   /// @date 01/016/12
   void pickle(string filename);
 
+  /// @brief This loads a csv file, putting the data into a data map
+  /// @param filename The name of the csv file including path and extension
+  /// @author SMM (ported into FlowInfo FJC 23/03/17)
+  /// @date 16/02/2017
+  map<string, vector<string> > load_csv_data(string filename);
+
+  /// @brief This gets a data column from the csv file
+  /// @param column_name a string that holds the column name
+  /// @return a vector of strings: this holds the data.
+  /// @author SMM (ported into FlowInfo FJC 23/03/17)
+  /// @date 17/02/2017
+  vector<string> get_data_column(string column_name, map<string, vector<string> > data_map);
+
+  /// @brief This gets a data column from the csv file, and converts it to a
+  ///   float vector
+  /// @param column_name a string that holds the column name
+  /// @return a vector of floats: this holds the data.
+  /// @author SMM (ported into FlowInfo FJC 23/03/17)
+  /// @date 17/02/2017
+  vector<float> data_column_to_float(string column_name, map<string, vector<string> > data_map);
+
+  /// @brief This gets a data column from the csv file, and converts it to an
+  ///   int vector
+  /// @param column_name a string that holds the column name
+  /// @return a vector of ints: this holds the data.
+  /// @author SMM (ported into FlowInfo FJC 23/03/17)
+  /// @date 17/02/2017
+  vector<int> data_column_to_int(string column_name, map<string, vector<string> > data_map);
+
   /// @brief Method to ingest the channel heads raster generated using channel_heads_driver.cpp
   /// into a vector of source nodes so that an LSDJunctionNetwork can be created easily
   /// from them.  **UPDATE** if the extension is a csv file it reads the node indices directly
@@ -420,6 +449,22 @@ class LSDFlowInfo
   /// @author SWDG updated SMM updated DTM
   /// @date 6/6/14 Happy 3rd birthday Skye!!
   vector<int> Ingest_Channel_Heads(string filename, string extension, int input_switch = 2);
+
+  /// @brief Method to ingest the channel heads raster generated using channel_heads_driver.cpp
+  /// into a vector of source nodes so that an LSDJunctionNetwork can be created easily
+  /// from them.  **UPDATE** if the extension is a csv file it reads the node indices directly
+  /// **UPDATE, FJC 20/01/16 - changed default input switch to 2**
+  /// ***********UPDATE - overloaded function to read in the column headers using the csv logic
+  /// rather than assume that the columns have to be in a specific order. ONLY WORKS WITH CSV
+  /// EXTENSIONS. FJC 23/03/17*************************
+  /// @details Assumes the FlowInfo object has the same dimensions as the channel heads raster.
+  /// @param filename of the channel heads raster.
+  /// @param extension of the channel heads raster.
+  /// @param (optional) input_switch, ONLY NEEDED FOR LOADING .csv FILES! An integer to determine whether to use the node index (0 -> default), row and column indices (1), or point coordinates from .csv file (2) to locate the channel heads
+  /// @return Vector of source nodes.
+  /// @author SWDG updated SMM updated DTM
+  /// @date 6/6/14 Happy 3rd birthday Skye!!
+  vector<int> Ingest_Channel_Heads(string filename, int input_switch = 2);
 
 	/// @brief Method to ingest sources from OS MasterMap Water Network Layer (csv) into a vector
 	/// of source nodes so that an LSDJunctionNetwork can be easily created from them.
