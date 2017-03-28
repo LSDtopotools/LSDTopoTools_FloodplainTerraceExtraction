@@ -19,7 +19,7 @@
 #include <vector>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
-#include "LSDCloudBase.hpp"
+#include "LSDCloudRaster.hpp"
 #include "LSDShapeTools.hpp"
 #include "LSDIndexChannel.hpp"
 // PCL
@@ -28,7 +28,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/octree/octree.h>
 // liblas
-#include <liblas/liblas.hpp>
+//#include <liblas/liblas.hpp>
 using namespace std;
 using namespace TNT;
 

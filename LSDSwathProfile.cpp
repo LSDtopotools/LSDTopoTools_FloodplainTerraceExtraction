@@ -33,7 +33,7 @@
 // LSDTopotools objects
 #include "LSDRaster.hpp"
 #include "LSDIndexRaster.hpp"
-#include "LSDCloudBase.hpp"
+#include "LSDCloudRaster.hpp"
 #include "LSDShapeTools.hpp"
 #include "LSDSwathProfile.hpp"
 #include "LSDStatsTools.hpp"
@@ -44,7 +44,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/octree/octree.h>
 // liblas
-#include <liblas/liblas.hpp>
+//#include <liblas/liblas.hpp>
 
 // TNT
 #include "TNT/tnt.h"
@@ -163,7 +163,7 @@ void LSDSwath::create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float
 
   // Read profile data into a LSDCloud object for querying
   vector<float> zeros(NPtsInProfile,0.0);
-  LSDCloud ProfileCloud(ProfilePoints, RasterTemplate);
+  LSDCloudRaster ProfileCloud(ProfilePoints, RasterTemplate);
 
   // For each point in array, find nearest point along the profile and calculate
   // signed distance to profile.  The convention here is that points lying on
@@ -520,7 +520,7 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
 
   // Read profile data into a LSDCloud object for querying
   vector<float> zeros(NPtsInProfile,0.0);
-  LSDCloud ProfileCloud(ProfilePoints, RasterTemplate);
+  LSDCloudRaster ProfileCloud(ProfilePoints, RasterTemplate);
 
   // For each point in array, find nearest point along the profile and calculate
   // signed distance to profile.  The convention here is that points lying on

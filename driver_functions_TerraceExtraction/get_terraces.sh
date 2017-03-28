@@ -2,5 +2,5 @@
 cd build/
 cmake .
 make
-mv terraces_swath_driver.out ../
+mv get_terraces.out ../
 cd ..

@@ -48,7 +48,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "---------------------------------------------------------" << endl;
     cout << "Then the command line argument will be, for example: " << endl;
     cout << "In linux:" << endl;
-    cout << "./terraces_swath_driver.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_Swath.param" << endl;
+    cout << "./get_terraces.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_terraces.param" << endl;
     cout << "=========================================================" << endl;
     exit(EXIT_SUCCESS);
   }
