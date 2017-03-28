@@ -825,7 +825,7 @@ void LSDSwath::get_transverse_swath_profile(LSDRaster& Raster, vector<float> des
   int NumberOfPercentileProfiles = desired_percentiles.size();
   if (NumberOfPercentileProfiles > 0)
   {
-    vector<long unsigned int> index_map;
+    vector<size_t> index_map;
     matlab_float_sort(RasterValues,RasterValues,index_map);
     matlab_float_reorder(TransverseDistance, index_map, TransverseDistance);
   }
@@ -923,7 +923,7 @@ void LSDSwath::get_longitudinal_swath_profile(LSDRaster& Raster, vector<float> d
   int NumberOfPercentileProfiles = desired_percentiles.size();
   if (NumberOfPercentileProfiles > 0)
   {
-    vector<long unsigned int> index_map;
+    vector<size_t> index_map;
     matlab_float_sort(RasterValues,RasterValues,index_map);
     matlab_float_reorder(LongitudinalDistance, index_map, LongitudinalDistance);
   }
