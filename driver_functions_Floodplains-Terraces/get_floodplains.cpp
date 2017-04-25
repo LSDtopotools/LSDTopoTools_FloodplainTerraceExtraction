@@ -149,7 +149,7 @@ int main (int nNumberofArgs,char *argv[])
 
 	cout << "\t Loading Sources..." << endl;
 	// load the sources
-	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 0);
+	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 2);
 	cout << "\t Got sources!" << endl;
 
 	// now get the junction network
