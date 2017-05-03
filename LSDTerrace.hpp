@@ -12,6 +12,7 @@
 #include "LSDIndexRaster.hpp"
 #include "LSDJunctionNetwork.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDFloodplain.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -27,8 +28,8 @@ class LSDTerrace
   /// must be below the slope and channel relief threshold to be classified as a terrace pixel.
   /// @author FJC
 	/// 18/10/16
-  LSDTerrace(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO, float RemoveChannelThreshold)
-					{ create(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, min_patch_size, threshold_SO, RemoveChannelThreshold); }
+  LSDTerrace(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO)
+					{ create(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, min_patch_size, threshold_SO); }
 
 	/// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
@@ -124,6 +125,14 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   /// @date 02/02/17
   LSDRaster get_Terraces_RasterValues(LSDRaster& InputRaster);
 
+  /// @brief This function combines the floodplains and terraces into one IndexRaster
+  /// terraces = 1; floodplains = 2
+  /// @param Floodplains LSDFloodplain object
+  /// @return index raster of terrace and floodplain locations
+  /// @author FJC
+  /// @date 03/05/17
+  LSDIndexRaster get_combined_terraces_and_floodplains_raster(LSDFloodplain& Floodplains);
+
 	/// FUNCTIONS TO PRINT TEXT FILES
 
 	/// @brief This function prints the upstream distance and channel relief of the floodplain pixels
@@ -200,7 +209,7 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	Array2D<float> MainStemDist_array;
 
   private:
-	void create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO, float RemoveChannelThreshold);
+	void create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO);
 
 };
 

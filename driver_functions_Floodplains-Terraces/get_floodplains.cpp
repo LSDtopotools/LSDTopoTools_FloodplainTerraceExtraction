@@ -194,6 +194,11 @@ int main (int nNumberofArgs,char *argv[])
 	cout << "Getting the floodplain object" << endl;
 	LSDFloodplain Floodplain(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"]);
 
+	//print connected components
+	LSDIndexRaster CC = Floodplain.print_ConnectedComponents_to_Raster();
+	string cc_ext = "_CC";
+	CC.write_raster((DATA_DIR+DEM_ID+cc_ext), DEM_extension);
+
 	// get the relief relative to nearest channel
 	Floodplain.Get_Relief_of_Nearest_Channel(ChanNetwork, FlowInfo, filled_topo_test, DistFromOutlet, this_int_map["Threshold_SO"]);
 

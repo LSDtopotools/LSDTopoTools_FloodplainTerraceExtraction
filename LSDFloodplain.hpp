@@ -119,6 +119,11 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @date 20/10/16
 	void print_Binned_ChannelRelief_to_File(string filename, float& bin_width, float& bin_lower_limit, float& bin_threshold);
 
+  /// @brief This function returns the array of floodplain nodes
+	/// @author FJC
+	/// @date 03/05/17
+  Array2D<int> get_FloodplainArray() const { return FloodplainNodes_array; }
+
   protected:
 
 	/// Number of rows

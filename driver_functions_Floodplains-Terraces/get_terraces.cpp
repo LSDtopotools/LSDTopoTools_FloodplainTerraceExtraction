@@ -49,6 +49,8 @@ int main (int nNumberofArgs,char *argv[])
     cout << "Then the command line argument will be, for example: " << endl;
     cout << "In linux:" << endl;
     cout << "./get_terraces.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_terraces.param" << endl;
+		cout << "For more information please see the documentation: " << endl;
+		cout << "http://lsdtopotools.github.io/LSDTT_book/#_terraces" << endl;
     cout << "=========================================================" << endl;
     exit(EXIT_SUCCESS);
   }
@@ -76,7 +78,6 @@ int main (int nNumberofArgs,char *argv[])
 	float_default_map["Min slope filling"] = 0.0001;
 	float_default_map["QQ threshold"] = 0.005;
 	float_default_map["HalfWidth"] = 500;
-	float_default_map["Min terrace height"] = 5;
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
@@ -144,7 +145,7 @@ int main (int nNumberofArgs,char *argv[])
 	}
 	else
 	{
-		//previously done the filtering and filling, just load the filled DEM
+		//don't do the filtering, just load the filled DEM
 		LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
 		RasterTemplate = load_DEM;
 	}
@@ -227,9 +228,8 @@ int main (int nNumberofArgs,char *argv[])
 
 		cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
 
-		cout << "Removing pixels within " << this_float_map["Min terrace height"] << " m of the modern channel" << endl;
 		// get the terrace pixels
-		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_float_map["Min terrace height"]);
+		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"]);
 		LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
 		string CC_ext = "_terrace_IDs";
 		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
