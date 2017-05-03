@@ -72,6 +72,7 @@ int main (int nNumberofArgs,char *argv[])
 	int_default_map["Min patch size"] = 1000;
 	int_default_map["search_radius"] = 10;
 	int_default_map["NormaliseToBaseline"] = 1;
+	int_default_map["Min terrace height"] = 2;
 
 	// set default float parameters
 	float_default_map["surface_fitting_window_radius"] = 6;
@@ -229,8 +230,7 @@ int main (int nNumberofArgs,char *argv[])
 		cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
 
 		// get the terrace pixels
-		int RemoveChannelThreshold = 2;
-		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], RemoveChannelThreshold);
+		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_int_map["Min terrace height"]);
 		LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
 		string CC_ext = "_terrace_IDs";
 		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
