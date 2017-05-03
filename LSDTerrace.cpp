@@ -82,7 +82,7 @@ using namespace TNT;
 // FJC 18/10/16
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO)
+void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO, int RemoveChannelThreshold)
 {
 
   /// set the protected variables
@@ -106,7 +106,7 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 	TerraceNodes_array = TempLinkArray.copy();
 
 	//declare the vectors
-	vector<int> TerraceNodes_temp, TerraceIDs_temp, patch_ids_channel;
+	vector<int> TerraceNodes_temp, patch_ids_channel;
 
 	//loop through every row and col and get the slope and relief values
   for (int i =0; i < NRows; i++)
@@ -119,7 +119,7 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
         float relief = ChannelRelief.get_data_element(i,j);
 				//terraces must fall within the relief and slope thresholds
 				// if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold && StreamOrderArray[i][j] < 3)
-				if (relief < relief_threshold && slope < slope_threshold)
+				if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold)
         {
           BinaryArray[i][j] = 1;
         }
@@ -140,26 +140,9 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 		ConnectedComponents_Array = ConnectedComponents.get_RasterData();
 	}
 
-	// separate into floodplain and terrace patches
+	// push back the terrace IDs to vector
+	vector<int> TerraceIDs_temp = Unique(ConnectedComponents_Array, NoDataValue);
 
-  //loop through the DEM and get the ID of all patches connected to the channel network
-  for (int row = 0; row < NRows; row++)
-  {
-    for (int col = 0; col < NCols; col++)
-    {
-      if (ConnectedComponents_Array[row][col] != NoDataValue)
-      {
-      //check if the pixel is part of the channel network
-        if (StreamOrderArray[row][col] >= threshold_SO)
-        {
-          patch_ids_channel.push_back(ConnectedComponents_Array[row][col]);
-        }
-      }
-    }
-  }
-
-	//for each pixel, find if it is connected to the channel
-	vector<int>::iterator find_it;
 	for (int row = 0; row < NRows; row++)
 	{
 		for (int col = 0; col < NCols; col++)
@@ -167,26 +150,15 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 			if (ConnectedComponents_Array[row][col] != NoDataValue)
 			{
 				int ThisNode = FlowInfo.retrieve_node_from_row_and_column(row, col);
-				int patch_id = ConnectedComponents_Array[row][col];
-				find_it = find(patch_ids_channel.begin(), patch_ids_channel.end(), patch_id);   //search ID vector for patch ID of pixel
-				if (find_it != patch_ids_channel.end())  //patch ID is connected to the channel, remove
-				{
-					ConnectedComponents_Array[row][col] = NoDataValue;
-				}
-				else
-				{
-					TerraceNodes_temp.push_back(ThisNode);
-					TerraceNodes_array[row][col] = ThisNode;
-					TerraceIDs_temp.push_back(patch_id);
-				}
+				TerraceNodes_temp.push_back(ThisNode);
+				TerraceNodes_array[row][col] = ThisNode;
 			}
 		}
 	}
 
-	// get unique terrace IDs
-	TerraceIDs = Unique(TerraceIDs_temp);
 	//copy to vector
 	TerraceNodes = TerraceNodes_temp;
+	TerraceIDs = TerraceIDs_temp;
 }
 
 

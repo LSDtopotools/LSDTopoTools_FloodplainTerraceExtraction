@@ -229,7 +229,8 @@ int main (int nNumberofArgs,char *argv[])
 		cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
 
 		// get the terrace pixels
-		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"]);
+		int RemoveChannelThreshold = 2;
+		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], RemoveChannelThreshold);
 		LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
 		string CC_ext = "_terrace_IDs";
 		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
