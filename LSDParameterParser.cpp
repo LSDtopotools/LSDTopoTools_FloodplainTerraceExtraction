@@ -245,7 +245,7 @@ void LSDParameterParser::LSDPP_parse_file_into_parameter_map(string FullName)
 // This uses the parameter map to get file input and output
 void LSDParameterParser::parse_file_IO()
 {
-
+  bool found_cheads = false;
   if(parameter_map.find("dem read extension") != parameter_map.end())
   {
     dem_read_extension = parameter_map["dem read extension"];
@@ -285,16 +285,46 @@ void LSDParameterParser::parse_file_IO()
     read_fname = RemoveControlCharactersFromEndOfString(read_fname);
     //cout << "Got the write name, it is: "  << write_fname << endl;
   }
-  if(parameter_map.find("channel heads fname") != parameter_map.end())
+  if(parameter_map.find("CHeads_file") != parameter_map.end())
   {
-    CHeads_file = parameter_map["channel heads fname"];
+    CHeads_file = parameter_map["CHeads_file"];
     // get rid of any control characters from the end (if param file was made in DOS)
     CHeads_file = RemoveControlCharactersFromEndOfString(CHeads_file);
     //cout << "Got the channel heads name, it is: " << CHeads_file << endl;
+    if(found_cheads)
+    {
+      cout << "Warning, channel head file is being overwritten--you have it twice in parameter file." << endl;
+    }
+    found_cheads = true;
+  }
+  else
+  {
+    CHeads_file = "NULL";
   }
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This forces parsing of everything in the file
+// Used for copying parameter files
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParameterParser::force_parse()
+{
+  cout << "Forcing parsing of the parameter file" << endl;
+  for( map<string, string >::iterator it = parameter_map.begin(); it != parameter_map.end(); ++it)
+  {
+    string key = it->first;
+    cout << "Key is: " <<it->first << "\n";
+    if(key != "CHeads file" && key != "read fname" && key != "write fname" &&
+        key != "read path" && key != "write path" && key != "read extension" &&
+        key != "write extension" && key != "NULL")
+    {
+      parameters_read_map[it->first] = it->second;
+    }
+  }
+
+}
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This parses all the default parameter maps.
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -701,5 +731,119 @@ void LSDParameterParser::print_parameters()
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This prints parameters read to file, so you can make sure your parameters
+// have ingested properly
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParameterParser::print_parameters(string fname_prefix)
+{
+  string fname = write_path+fname_prefix;
+  ofstream params_out;
+  params_out.open(fname.c_str());
+
+  params_out << "# Here are the paramters ingested and set by the parameter parser" << endl;
+  params_out << "# The file names and paths are: " << endl;
+  params_out << "read path: " << read_path << endl;
+  params_out << "read fname: " << read_fname << endl;
+  params_out << "write path: " << write_path << endl;
+  params_out << "write fname: " << write_fname << endl;
+  params_out << "CHeads file: " << CHeads_file << endl;
+
+  params_out << "read extension: " << dem_read_extension << endl;
+  params_out << "write extension: " << dem_write_extension << endl << endl;
+
+  params_out << "# ===================================="  << endl;
+  params_out << "# Now for parameters read from file." << endl;
+  params_out << "# If an expected parameter is not here check your spelling." << endl;
+
+  vector<string> empty_vec;
+  vector<string> these_keys = extract_keys(parameters_read_map);
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    params_out << these_keys[i] << ": " << parameters_read_map[these_keys[i]]  << endl;
+  }
+
+
+  params_out << endl << "# ===================================="  << endl;
+  params_out << "# Now for the default parameters." << endl;
+
+  these_keys = empty_vec;
+  these_keys = extract_keys(defaults_used_map);
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    params_out << these_keys[i] << ": " << defaults_used_map[these_keys[i]]  << endl;
+  }
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This prints parameters read to file, so you can make sure your parameters
+// have ingested properly
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParameterParser::replace_and_print_parameter_file(string parameter_fname,
+                                     string new_read_path, string new_read_fname,
+                                     string new_write_path, string new_write_fname,
+                                     map<string,string> replace_parameters)
+{
+  string fname = write_path+parameter_fname;
+  ofstream params_out;
+  params_out.open(fname.c_str());
+
+  params_out << "# This is an adjusted parameter file" << endl;
+  params_out << "# The file names and paths are: " << endl;
+  params_out << "read path: " << new_read_path << endl;
+  params_out << "read fname: " << new_read_fname << endl;
+  params_out << "write path: " << new_write_path << endl;
+  params_out << "write fname: " << new_write_fname << endl;
+  params_out << "CHeads file: " << CHeads_file << endl;
+
+  params_out << "read extension: " << dem_read_extension << endl;
+  params_out << "write extension: " << dem_write_extension << endl << endl;
+
+  params_out << "# ===================================="  << endl;
+  params_out << "# Now for parameters read from file." << endl;
+  params_out << "# If an expected parameter is not here check your spelling." << endl;
+
+  vector<string> empty_vec;
+  vector<string> these_keys = extract_keys(parameters_read_map);
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    // If the key is contained in the replace parameters, use the replace parameter
+    if(replace_parameters.find(these_keys[i]) != replace_parameters.end())
+    {
+      cout << "I found a replace parameter!" << endl;
+      params_out << these_keys[i] << ": " << replace_parameters[these_keys[i]]  << endl;
+    }
+    else
+    {
+      params_out << these_keys[i] << ": " << parameters_read_map[these_keys[i]]  << endl;
+    }
+  }
+
+  params_out << endl << "# ===================================="  << endl;
+  params_out << "# Now for the default parameters." << endl;
+
+  these_keys = empty_vec;
+  these_keys = extract_keys(defaults_used_map);
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    // If the key is contained in the replace parameters, use the replace parameter
+    if(replace_parameters.find(these_keys[i]) != replace_parameters.end())
+    {
+      cout << "I found a replace parameter!" << endl;
+      params_out << these_keys[i] << ": " << replace_parameters[these_keys[i]]  << endl;
+    }
+    else
+    {
+      params_out << these_keys[i] << ": " << defaults_used_map[these_keys[i]]  << endl;
+    }
+  }
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 
 #endif
