@@ -199,6 +199,12 @@ int main (int nNumberofArgs,char *argv[])
 	LSDSpatialCSVReader SwathPoints(RasterTemplate, DATA_DIR+this_string_map["coords_csv_file"]);
 	vector<float> UTME;
 	vector<float> UTMN;
+	// check if we've got the right zone
+	bool is_North;
+	int UTM_zone;
+	SwathPoints.get_UTM_information(UTM_zone, is_North);
+  cout << "The UTM Zone is: " << UTM_zone << " North? " << is_North << endl; 
+
 	SwathPoints.get_x_and_y_from_latlong(UTME, UTMN);
 	cout << "\t Got the x and y locations" << endl;
 	string csv_outname = "_UTM_check.csv";
