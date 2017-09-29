@@ -73,6 +73,7 @@ int main (int nNumberofArgs,char *argv[])
 	int_default_map["search_radius"] = 10;
 	int_default_map["NormaliseToBaseline"] = 1;
 	int_default_map["Min terrace height"] = 2;
+	int_default_map["Chan area threshold"] = 1000;
 
 	// set default float parameters
 	float_default_map["surface_fitting_window_radius"] = 6;
@@ -82,6 +83,7 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
+	bool_default_map["write hillshade"] = false;
 
 	// set default string parameters
 	string_default_map["coords_csv_file"] = "NULL";
@@ -158,9 +160,35 @@ int main (int nNumberofArgs,char *argv[])
 	cout << "\t Loading the sources" << endl;
 	// calcualte the distance from outlet
 	LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
-	// load the sources
-	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 2);
-	cout << "\t Got sources!" << endl;
+	// some error checking
+	vector<int> sources;
+	if (CHeads_file == "NULL")
+	{
+		cout << "I can't find your channel heads file so I'm going to use an area threshold to extract the sources" << endl;
+		LSDIndexRaster ContributingPixels = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+		sources = FlowInfo.get_sources_index_threshold(ContributingPixels, this_int_map["Chan_area_threshold"]);
+	}
+	else
+	{
+		cout << "\t Loading the sources" << endl;
+		// load the sources
+		vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv", 2);
+		cout << "\t Got sources!" << endl;
+	}
+
+	// check to see if you need hillshade
+	if (this_bool_map["write hillshade"])
+	{
+		float hs_azimuth = 315;
+		float hs_altitude = 45;
+		float hs_z_factor = 1;
+		LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+		string hs_fname = DATA_DIR+DEM_ID+"_hs";
+		hs_raster.write_raster(hs_fname,DEM_extension);
+	}
+
+
 
 	// now get the junction network
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
