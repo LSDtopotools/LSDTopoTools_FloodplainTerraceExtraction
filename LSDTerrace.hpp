@@ -13,6 +13,14 @@
 #include "LSDJunctionNetwork.hpp"
 #include "LSDStatsTools.hpp"
 #include "LSDFloodplain.hpp"
+#include "LSDSwathProfile.hpp"
+
+// PCL
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/octree/octree.h>
+
 using namespace std;
 using namespace TNT;
 
@@ -153,6 +161,15 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   //// FJC 07/03/17
   ////----------------------------------------------------------------------------------------
   void print_TerraceAreas_to_file(string filename, LSDFlowInfo& FlowInfo);
+
+  /// @brief This function prints information about each terrace pixel to a csv file.
+  /// @param csv_filename filename of the csv
+  /// @param ElevationRaster elevation raster
+  /// @param FlowInfo LSDFlowInfo object
+  /// @param Swath LSDSwathProfile object
+	/// @author FJC
+	/// @date 28/09/17
+  void print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDFlowInfo& FlowInfo, LSDSwath& Swath);
 
   protected:
 

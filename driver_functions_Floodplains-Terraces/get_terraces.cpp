@@ -83,7 +83,6 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
-	bool_default_map["write hillshade"] = false;
 
 	// set default string parameters
 	string_default_map["coords_csv_file"] = "NULL";
@@ -112,12 +111,6 @@ int main (int nNumberofArgs,char *argv[])
 	vector<string> boundary_conditions = LSDPP.get_boundary_conditions();
 	string CHeads_file = LSDPP.get_CHeads_file();
 
-	// some error checking
-	if (CHeads_file.empty())
-	{
-		cout << "FATAL ERROR: I can't find your channel heads file. Check your spelling!! \n The parameter key needs to be 'channel heads fname'" << endl;
-		exit(EXIT_SUCCESS);
-	}
 	if (this_string_map["coords_csv_file"] == "NULL")
 	{
 		cout << "FATAL ERROR: I can't find your coordinates file. Check your spelling!! \n The parameter key needs to be 'coords_csv_file'" << endl;
@@ -156,10 +149,9 @@ int main (int nNumberofArgs,char *argv[])
 	cout << "\t Flow routing..." << endl;
 	// get a flow info object
 	LSDFlowInfo FlowInfo(boundary_conditions, RasterTemplate);
-
-	cout << "\t Loading the sources" << endl;
 	// calcualte the distance from outlet
 	LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
+
 	// some error checking
 	vector<int> sources;
 	if (CHeads_file == "NULL")
@@ -176,20 +168,6 @@ int main (int nNumberofArgs,char *argv[])
 		cout << "\t Got sources!" << endl;
 	}
 
-	// check to see if you need hillshade
-	if (this_bool_map["write hillshade"])
-	{
-		float hs_azimuth = 315;
-		float hs_altitude = 45;
-		float hs_z_factor = 1;
-		LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
-
-		string hs_fname = DATA_DIR+DEM_ID+"_hs";
-		hs_raster.write_raster(hs_fname,DEM_extension);
-	}
-
-
-
 	// now get the junction network
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   cout << "\t Got the channel network" << endl;
@@ -199,12 +177,6 @@ int main (int nNumberofArgs,char *argv[])
 	LSDSpatialCSVReader SwathPoints(RasterTemplate, DATA_DIR+this_string_map["coords_csv_file"]);
 	vector<float> UTME;
 	vector<float> UTMN;
-	// check if we've got the right zone
-	bool is_North;
-	int UTM_zone;
-	SwathPoints.get_UTM_information(UTM_zone, is_North);
-  cout << "The UTM Zone is: " << UTM_zone << " North? " << is_North << endl; 
-
 	SwathPoints.get_x_and_y_from_latlong(UTME, UTMN);
 	cout << "\t Got the x and y locations" << endl;
 	string csv_outname = "_UTM_check.csv";
@@ -272,15 +244,22 @@ int main (int nNumberofArgs,char *argv[])
 		cout << "\t Testing connected components" << endl;
 		vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
 
-		// push back results to file for plotting
-		ofstream output_file_CC;
-		string output_fname = "_terrace_swath_plots.txt";
-		output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
-		for (int i = 0; i < int(CC_vector[0].size()); ++i)
-		{
-			output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
-		}
-		output_file_CC.close();
+		// // push back results to file for plotting
+		// ofstream output_file_CC;
+		// string output_fname = "_terrace_swath_plots.txt";
+		// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
+		// for (int i = 0; i < int(CC_vector[0].size()); ++i)
+		// {
+		// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
+		// }
+		// output_file_CC.close();
+
+		// print the terrace information to a csv
+		string csv_fname = "_terrace_info.csv";
+		string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
+		cout << "The full csv filename is: " << full_csv_name << endl;
+		Terraces.print_TerraceInfo_to_csv(full_csv_name, ElevationRaster, FlowInfo, TestSwath);
+
 
 		// write raster of terrace elevations
 		LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);

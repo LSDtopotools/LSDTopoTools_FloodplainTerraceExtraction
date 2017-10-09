@@ -65,6 +65,7 @@
 #include "LSDIndexChannel.hpp"
 #include "LSDJunctionNetwork.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDSwathProfile.hpp"
 #include "LSDFloodplain.hpp"
 #include "LSDTerrace.hpp"
 using namespace std;
@@ -126,10 +127,10 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
       }
     }
   }
-	LSDIndexRaster FloodplainRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,BinaryArray,GeoReferencingStrings);
+	LSDIndexRaster TerraceRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,BinaryArray,GeoReferencingStrings);
 
-	// run the connected components algorithm on the floodplain array
-	LSDIndexRaster ConnectedComponents = FloodplainRaster.ConnectedComponents();
+	// run the connected components algorithm on the terrace array
+	LSDIndexRaster ConnectedComponents = TerraceRaster.ConnectedComponents();
 	if (min_patch_size > 0)
 	{
 		LSDIndexRaster ConnectedComponents_final = ConnectedComponents.RemoveSmallPatches(min_patch_size);
@@ -315,6 +316,15 @@ void LSDTerrace::get_terraces_along_main_stem(int junction_number, LSDJunctionNe
 		}
 	}
 }
+
+//----------------------------------------------------------------------------------------
+// This function compiles the data along each terrace into a single bin for each point
+// along the main stem. It returns a vector of vectors with
+//----------------------------------------------------------------------------------------
+// vector< vector<float> > LSDTerrace::Collate_TerraceData_Along_MainStem()
+// {
+//
+// }
 
 //----------------------------------------------------------------------------------------
 // FUNCTIONS TO GENERATE RASTERS
@@ -530,6 +540,73 @@ void LSDTerrace::print_TerraceAreas_to_file(string filename, LSDFlowInfo& FlowIn
 		// get the area of this terrace - n pixels * DataRes^2
 		float TerraceArea = n_pixels*DataResolution*DataResolution;
 		output_file << this_CC << "," << TerraceArea << endl;
+	}
+	output_file.close();
+}
+////----------------------------------------------------------------------------------------
+//// Write a csv file giving elevation and distance information for each pixel in each terrace.
+//// FJC 28/09/17
+////----------------------------------------------------------------------------------------
+void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDFlowInfo& FlowInfo, LSDSwath& Swath)
+{
+	ofstream output_file;
+	output_file.open(csv_filename.c_str());
+	if (!output_file)
+ {
+		 cout << "\n Error opening output csv file. Please check your filename";
+		 exit(1);
+ }
+ cout << "Opened the csv" << endl;
+
+	output_file << "TerraceID,Elevation,DistAlongBaseline,ChannelRelief" << endl;
+
+	LSDIndexRaster ConnectedComponents(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,ConnectedComponents_Array,GeoReferencingStrings);
+
+	cout << "Got the CC raster" << endl;
+
+	// get the baseline distance array
+	Array2D<float> BaselineDistance = Swath.get_BaselineDist_ConnectedComponents(ConnectedComponents);
+	Array2D<float> ElevationArray = ElevationRaster.get_RasterData();
+
+	// do we need to get the bounding box of the swath?? probably. this is a massive pain
+	// that took me hours to debug.
+	float XMin = Swath.get_XMin();
+	float YMin = Swath.get_YMin();
+	float XMax = Swath.get_XMax();
+	float YMax = Swath.get_YMax();
+	float ProfileHalfWidth = Swath.get_ProfileHalfWidth();
+
+	// now get the bounding box
+	int ColStart = int(floor((XMin)/DataResolution));
+	int ColEnd = ColStart + int(ceil((XMax-XMin)/DataResolution));
+	ColStart = ColStart - int(ceil(ProfileHalfWidth/DataResolution));
+	ColEnd = ColEnd + int(ceil(ProfileHalfWidth/DataResolution));
+	if (ColStart < 0) ColStart = 0;
+	if (ColEnd > NCols) ColEnd = NCols;
+
+	int RowEnd = NRows - 1 - int(floor(YMin/DataResolution));
+	int RowStart = RowEnd - int(ceil((YMax-YMin)/DataResolution));
+	RowStart = RowStart - int(ceil(ProfileHalfWidth/DataResolution));
+	RowEnd = RowEnd + int(ceil(ProfileHalfWidth/DataResolution));
+	if (RowEnd > NRows) RowEnd = NRows;
+	if (RowStart < 0) RowStart = 0;
+
+	cout << "Now writing the terrace information to the csv file..." << endl;
+	// loop through all the rows and cols and print some information
+	for (int row=RowStart; row<RowEnd; row++)
+  {
+    for (int col=ColStart; col<ColEnd; col++)
+    {
+			if (ConnectedComponents_Array[row][col] != NoDataValue)
+			{
+				cout << "This row: " << row << " this col: " << col << endl;
+				cout << "this_cc: " << ConnectedComponents_Array[row][col] << endl;
+				//int this_node = FlowInfo.retrieve_node_from_row_and_column(row, col);
+				float this_elev = ElevationRaster.get_data_element(row,col);
+				cout << " this_elev: " << this_elev << endl << " this_dist: " << BaselineDistance[row][col] << " this_relief: " << ChannelRelief_array[row][col] << endl;
+				output_file << ConnectedComponents_Array[row][col] << "," << ElevationArray[row][col] << "," << BaselineDistance[row][col] << "," << ChannelRelief_array[row][col] << endl;
+			}
+		}
 	}
 	output_file.close();
 }

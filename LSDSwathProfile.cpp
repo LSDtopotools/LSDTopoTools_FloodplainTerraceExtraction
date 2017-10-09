@@ -1102,8 +1102,10 @@ LSDRaster LSDSwath::fill_in_channels_swath(LSDRaster& Raster)
 // second raster to the baseline value.
 // vector of vectors has the format:
 // 0 = patch ID
-// 1 = mean raster value for the patch id
-// 2 = mean distance along the baseline
+// 1 = mean distance along the baseline
+// 2 = mean raster value for the patch id
+// 3 = standard deviation of raster value for patch id
+// 4 = standard error of raster value for patch id
 // FJC
 // 23/01/17
 //
@@ -1113,6 +1115,8 @@ vector <vector <float> > LSDSwath::get_connected_components_along_swath(LSDIndex
   vector <vector <float> > MasterVector;
   vector<float> RasterValues;
   vector<float> DistAlongBaseline;
+  vector<float> RasterStDevs;
+  vector<float> RasterStErrs;
 
   float Resolution = RasterTemplate.get_DataResolution();
 	Array2D<float> RasterValues_temp = RasterTemplate.get_RasterData();
@@ -1175,8 +1179,12 @@ vector <vector <float> > LSDSwath::get_connected_components_along_swath(LSDIndex
       }
     }
     float mean_value = get_mean(raster_values);
+    float stdev = get_standard_deviation(raster_values, mean_value);
+    float sterr = get_standard_error(raster_values, stdev);
     float mean_dist = get_mean(DistAlongBaseline_temp);
     RasterValues.push_back(mean_value);
+    RasterStDevs.push_back(stdev);
+    RasterStErrs.push_back(sterr);
     DistAlongBaseline.push_back(mean_dist);
   }
 
@@ -1184,14 +1192,68 @@ vector <vector <float> > LSDSwath::get_connected_components_along_swath(LSDIndex
 
   // store in the MasterVector
   MasterVector.push_back(Unique_Patches_float);
-  MasterVector.push_back(RasterValues);
   MasterVector.push_back(DistAlongBaseline);
+  MasterVector.push_back(RasterValues);
+  MasterVector.push_back(RasterStDevs);
+  MasterVector.push_back(RasterStErrs);
 
   return MasterVector;
 }
 
 //------------------------------------------------------------------------------
-// This function takes in a  raster and returns the mean, min and max values of
+// This function takes in a connected components raster
+// and returns an array with the distance along the baseline of each
+// point in the connected components raster
+// The raster_ID argument allows you to name the csv with a meaningful header
+// (e.g. elevation)
+// FJC
+// 28/09/17
+//
+//------------------------------------------------------------------------------
+Array2D<float> LSDSwath::get_BaselineDist_ConnectedComponents(LSDIndexRaster& ConnectedComponents)
+{
+  // declare baseline dist array
+  Array2D<float> BaselineDistance(NRows,NCols,NoDataValue);
+
+  // get some raster info
+  float Resolution = ConnectedComponents.get_DataResolution();
+	map<string,string> GeoReferencingStrings = ConnectedComponents.get_GeoReferencingStrings();
+
+  // Define bounding box of swath profile
+  int ColStart = int(floor((XMin)/Resolution));
+  int ColEnd = ColStart + int(ceil((XMax-XMin)/Resolution));
+  ColStart = ColStart - int(ceil(ProfileHalfWidth/Resolution));
+  ColEnd = ColEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (ColStart < 0) ColStart = 0;
+  if (ColEnd > NCols) ColEnd = NCols;
+
+  int RowEnd = NRows - 1 - int(floor(YMin/Resolution));
+  int RowStart = RowEnd - int(ceil((YMax-YMin)/Resolution));
+  RowStart = RowStart - int(ceil(ProfileHalfWidth/Resolution));
+  RowEnd = RowEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (RowEnd > NRows) RowEnd = NRows;
+  if (RowStart < 0) RowStart = 0;
+
+  // get the array of the connected components
+  Array2D<int> CC_array = ConnectedComponents.get_RasterData();
+
+  for (int row=RowStart; row<RowEnd; row++)
+  {
+    for (int col=ColStart; col<ColEnd; col++)
+    {
+      if (CC_array[row][col] != NoDataValue)
+      {
+        // get the baseline value
+        BaselineDistance[row][col] = BaselineValueArray[row][col];
+      }
+    }
+  }
+
+  return BaselineDistance;
+
+}
+//------------------------------------------------------------------------------
+// This function takes in a raster and returns the mean, min and max values of
 // the raster at each point along the swath
 // vector of vectors has the format:
 // 0 = distance along swath
