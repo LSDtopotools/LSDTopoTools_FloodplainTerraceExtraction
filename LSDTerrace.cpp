@@ -568,28 +568,30 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 	Array2D<float> BaselineDistance = Swath.get_BaselineDist_ConnectedComponents(ConnectedComponents);
 	Array2D<float> ElevationArray = ElevationRaster.get_RasterData();
 
+	cout << " Baseline dist size: " << BaselineDistance.size() << " Elevation array size: " << ElevationArray.size() << endl;
+
 	// do we need to get the bounding box of the swath?? probably. this is a massive pain
 	// that took me hours to debug.
-	float XMin = Swath.get_XMin();
-	float YMin = Swath.get_YMin();
-	float XMax = Swath.get_XMax();
-	float YMax = Swath.get_YMax();
-	float ProfileHalfWidth = Swath.get_ProfileHalfWidth();
-
-	// now get the bounding box
-	int ColStart = int(floor((XMin)/DataResolution));
-	int ColEnd = ColStart + int(ceil((XMax-XMin)/DataResolution));
-	ColStart = ColStart - int(ceil(ProfileHalfWidth/DataResolution));
-	ColEnd = ColEnd + int(ceil(ProfileHalfWidth/DataResolution));
-	if (ColStart < 0) ColStart = 0;
-	if (ColEnd > NCols) ColEnd = NCols;
-
-	int RowEnd = NRows - 1 - int(floor(YMin/DataResolution));
-	int RowStart = RowEnd - int(ceil((YMax-YMin)/DataResolution));
-	RowStart = RowStart - int(ceil(ProfileHalfWidth/DataResolution));
-	RowEnd = RowEnd + int(ceil(ProfileHalfWidth/DataResolution));
-	if (RowEnd > NRows) RowEnd = NRows;
-	if (RowStart < 0) RowStart = 0;
+	// float XMin = Swath.get_XMin();
+	// float YMin = Swath.get_YMin();
+	// float XMax = Swath.get_XMax();
+	// float YMax = Swath.get_YMax();
+	// float ProfileHalfWidth = Swath.get_ProfileHalfWidth();
+	//
+	// // now get the bounding box
+	// int ColStart = int(floor((XMin)/DataResolution));
+	// int ColEnd = ColStart + int(ceil((XMax-XMin)/DataResolution));
+	// ColStart = ColStart - int(ceil(ProfileHalfWidth/DataResolution));
+	// ColEnd = ColEnd + int(ceil(ProfileHalfWidth/DataResolution));
+	// if (ColStart < 0) ColStart = 0;
+	// if (ColEnd > NCols) ColEnd = NCols;
+	//
+	// int RowEnd = NRows - 1 - int(floor(YMin/DataResolution));
+	// int RowStart = RowEnd - int(ceil((YMax-YMin)/DataResolution));
+	// RowStart = RowStart - int(ceil(ProfileHalfWidth/DataResolution));
+	// RowEnd = RowEnd + int(ceil(ProfileHalfWidth/DataResolution));
+	// if (RowEnd > NRows) RowEnd = NRows;
+	// if (RowStart < 0) RowStart = 0;
 
 	cout << "Now writing the terrace information to the csv file..." << endl;
 	// loop through all the rows and cols and print some information
@@ -597,7 +599,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
   {
     for (int col=ColStart; col<ColEnd; col++)
     {
-			if (ConnectedComponents_Array[row][col] != NoDataValue)
+			if (ConnectedComponents_Array[row][col] != NoDataValue && BaselineDistance[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue)
 			{
 				cout << "This row: " << row << " this col: " << col << endl;
 				cout << "this_cc: " << ConnectedComponents_Array[row][col] << endl;
