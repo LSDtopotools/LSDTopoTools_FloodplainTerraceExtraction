@@ -33,14 +33,15 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "=========================================================" << endl;
     cout << "|| Welcome to the terrace swath tool!  	              ||" << endl;
-    cout << "|| This program takes in a csv file with latitude and  ||" << endl;
-		cout << "|| longitude and gets a swath profile along            ||" << endl;
-		cout << "|| a channel between the points. It then extracts			||" << endl;
-		cout << "|| the terraces along the channel using slope and		  ||" << endl;
-		cout << "|| relief thresholds.																	||" << endl;
+    cout << "|| This program takes in a baseline shapefile and gets ||" << endl;
+		cout << "|| a swath profile along a channel from it.            ||" << endl;
+		cout << "|| It then extracts the terraces along the channel     ||" << endl;
+		cout << "|| using slope and relief thresholds.								  ||" << endl;
     cout << "|| This program was developed by                       ||" << endl;
-    cout << "|| Fiona J. Clubb												              ||" << endl;
-    cout << "||  at the University of Edinburgh                     ||" << endl;
+    cout << "|| Fiona J. Clubb                                      ||" << endl;
+    cout << "|| at the University of Edinburgh.                     ||" << endl;
+		cout << "|| Was then further developed at the University of     ||" << endl;
+		cout << "|| Minnesota, AMERICAN STYLE.                          ||" << endl;
     cout << "=========================================================" << endl;
     cout << "This program requires two inputs: " << endl;
     cout << "* First the path to the parameter file." << endl;
@@ -48,9 +49,10 @@ int main (int nNumberofArgs,char *argv[])
     cout << "---------------------------------------------------------" << endl;
     cout << "Then the command line argument will be, for example: " << endl;
     cout << "In linux:" << endl;
-    cout << "./get_terraces.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_terraces.param" << endl;
+    cout << "./get_terraces_from_shapefile.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_terraces.param" << endl;
 		cout << "For more information please see the documentation: " << endl;
 		cout << "http://lsdtopotools.github.io/LSDTT_book/#_terraces" << endl;
+		cout << "Although the documentation is not up to date for this version, SORRY." << endl;
     cout << "=========================================================" << endl;
     exit(EXIT_SUCCESS);
   }
@@ -85,7 +87,7 @@ int main (int nNumberofArgs,char *argv[])
 	bool_default_map["Filter topography"] = true;
 
 	// set default string parameters
-	string_default_map["coords_csv_file"] = "NULL";
+	string_default_map["input_shapefile"] = "NULL";
 
 	// Use the parameter parser to get the maps of the parameters required for the
 	// analysis
@@ -172,104 +174,79 @@ int main (int nNumberofArgs,char *argv[])
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   cout << "\t Got the channel network" << endl;
 
-	// reading in the csv file with the lat long points
-	cout << "\t Reading in the csv file" << endl;
-	LSDSpatialCSVReader SwathPoints(RasterTemplate, DATA_DIR+this_string_map["coords_csv_file"]);
-	vector<float> UTME;
-	vector<float> UTMN;
-	SwathPoints.get_x_and_y_from_latlong(UTME, UTMN);
-	cout << "\t Got the x and y locations" << endl;
-	string csv_outname = "_UTM_check.csv";
-	SwathPoints.print_UTM_coords_to_csv(UTME, UTMN, (DATA_DIR+DEM_ID+csv_outname));
+	cout << "\t loading baseline points" << endl;
+	PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
 
-	// snap to nearest channel
-	vector<int> valid_indices;
-	vector<int> snapped_nodes;
-	vector<int> snapped_JNs;
-	ChanNetwork.snap_point_locations_to_channels(UTME, UTMN, this_int_map["search_radius"], this_int_map["Threshold_SO"], FlowInfo, valid_indices, snapped_nodes, snapped_JNs);
+  cout << "\t Creating swath template" << endl;
+  LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
 
-	cout << "The number of valid points is: " << int(valid_indices.size()) << endl;
+	cout << "\n\t Getting raster from swath" << endl;
+	LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
+	string swath_ext = "_swath_raster";
+	SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
-	if (int(valid_indices.size()) == 2)
-	{
-		// get the channel between these points
-		cout << "Got channel nodes: " << snapped_nodes[0] << ", " << snapped_nodes[1] << endl;
-		LSDIndexChannel BaselineChannel(snapped_nodes[0], snapped_nodes[1], FlowInfo);
-		vector<double> X_coords;
-		vector<double> Y_coords;
-		BaselineChannel.get_coordinates_of_channel_nodes(X_coords, Y_coords);
+	// get the elevation raster from the swath
+	//LSDRaster ElevationRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, 0);
 
-		// get the point data from the BaselineChannel
-		PointData BaselinePoints = get_point_data_from_coordinates(X_coords, Y_coords);
+  // get the slope
+	cout << "\t Getting the slope" << endl;
+  vector<LSDRaster> surface_fitting;
+  LSDRaster Slope;
+  vector<int> raster_selection(8, 0);
+  raster_selection[1] = 1;             // this means you want the slope
+  surface_fitting = RasterTemplate.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_window_radius"], raster_selection);
+  Slope = surface_fitting[1];
 
-	  cout << "\t Creating swath template" << endl;
-	  LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
+	float mask_threshold = 1.0;
+	bool below = 0;
+	// remove any stupid slope values
+	LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
 
-		cout << "\n\t Getting raster from swath" << endl;
-		LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
-		string swath_ext = "_swath_raster";
-		SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+	// get the channel relief and slope threshold using quantile-quantile plots
+	cout << "Getting channel relief threshold from QQ plots" << endl;
+	string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
+	float relief_threshold_from_qq = SwathRaster.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
 
-	  // get the slope
-		cout << "\t Getting the slope" << endl;
-	  vector<LSDRaster> surface_fitting;
-	  LSDRaster Slope;
-	  vector<int> raster_selection(8, 0);
-	  raster_selection[1] = 1;             // this means you want the slope
-	  surface_fitting = RasterTemplate.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_window_radius"], raster_selection);
-	  Slope = surface_fitting[1];
+	cout << "Getting slope threshold from QQ plots" << endl;
+	string qq_slope = DATA_DIR+DEM_ID+"_qq_slope.txt";
+	float slope_threshold_from_qq = Slope_new.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
 
-		float mask_threshold = 1.0;
-		bool below = 0;
-		// remove any stupid slope values
-		LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
+	cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
 
-		// get the channel relief and slope threshold using quantile-quantile plots
-		cout << "Getting channel relief threshold from QQ plots" << endl;
-		string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
-		float relief_threshold_from_qq = SwathRaster.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
+	// get the terrace pixels
+	LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_int_map["Min terrace height"]);
+	LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
+	string CC_ext = "_terrace_IDs";
+	ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
 
-		cout << "Getting slope threshold from QQ plots" << endl;
-		string qq_slope = DATA_DIR+DEM_ID+"_qq_slope.txt";
-		float slope_threshold_from_qq = Slope_new.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
+	// cout << "\t Testing connected components" << endl;
+	// vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
+	//
+	// // push back results to file for plotting
+	// ofstream output_file_CC;
+	// string output_fname = "_terrace_swath_plots.txt";
+	// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
+	// for (int i = 0; i < int(CC_vector[0].size()); ++i)
+	// {
+	// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
+	// }
+	// output_file_CC.close();
 
-		cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
+	// write raster of terrace elevations
+	LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
+	string relief_ext = "_terrace_relief_final";
+	ChannelRelief.write_raster((DATA_DIR+DEM_ID+relief_ext), DEM_extension);
 
-		// get the terrace pixels
-		LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_int_map["Min terrace height"]);
-		LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
-		string CC_ext = "_terrace_IDs";
-		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
+	// print the terrace information to a csv
+	string csv_fname = "_terrace_info.csv";
+	string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
+	cout << "The full csv filename is: " << full_csv_name << endl;
+	Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, ChannelRelief, FlowInfo, TestSwath);
 
-		cout << "\t Testing connected components" << endl;
-		vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
-
-		// // push back results to file for plotting
-		// ofstream output_file_CC;
-		// string output_fname = "_terrace_swath_plots.txt";
-		// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
-		// for (int i = 0; i < int(CC_vector[0].size()); ++i)
-		// {
-		// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
-		// }
-		// output_file_CC.close();
-
-		// print the terrace information to a csv
-		string csv_fname = "_terrace_info.csv";
-		string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
-		cout << "The full csv filename is: " << full_csv_name << endl;
-		Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, FlowInfo, TestSwath);
-
-
-		// write raster of terrace elevations
-		LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
-		string relief_ext = "_terrace_relief_final";
-		ChannelRelief.write_raster((DATA_DIR+DEM_ID+relief_ext), DEM_extension);
-	}
-	else
-	{
-		cout << "I was unable to find a channel between those coordinates! Check your coordinates or increase the search radius." << endl;
-	}
+	// print the information about the baseline channel to csv
+	string channel_csv_fname = "_baseline_channel_info.csv";
+	cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
+	TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname);
 
 	// Done, check how long it took
 	clock_t end = clock();
