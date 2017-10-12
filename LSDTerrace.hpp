@@ -169,7 +169,7 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   /// @param Swath LSDSwathProfile object
 	/// @author FJC
 	/// @date 28/09/17
-  void print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDFlowInfo& FlowInfo, LSDSwath& Swath);
+  void print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDRaster& ChannelRelief,  LSDFlowInfo& FlowInfo, LSDSwath& Swath);
 
   protected:
 
