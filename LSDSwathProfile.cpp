@@ -1489,9 +1489,15 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
   output_file << "DistAlongBaseline,Elevation" << endl;
 
   // loop through and get the values for the csv
-  for (int i = 0; i < int(BaselineRows.size()); i++)
+  for (int row=0; row < NRows; row++)
   {
-    output_file << DistanceAlongBaselineArray[BaselineRows[i]][BaselineCols[i]] << "," << ElevationArray[BaselineRows[i]][BaselineCols[i]] << endl;
+    for (int col=0; col < NCols; col++)
+    {
+      if (DistanceAlongBaselineArray[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue)
+      {
+        output_file << DistanceAlongBaselineArray[row][col] << "," << ElevationArray[row][col] << endl;
+      }
+    }
   }
   output_file.close();
 }
