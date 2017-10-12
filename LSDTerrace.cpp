@@ -558,7 +558,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
  }
  cout << "Opened the csv" << endl;
 
-	output_file << "TerraceID,Elevation,DistAlongBaseline,ChannelRelief" << endl;
+	output_file << "TerraceID,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
 
 	LSDIndexRaster ConnectedComponents(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,ConnectedComponents_Array,GeoReferencingStrings);
 
@@ -568,6 +568,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 	Array2D<float> BaselineDistance = Swath.get_BaselineDist_ConnectedComponents(ConnectedComponents);
 	Array2D<float> ElevationArray = ElevationRaster.get_RasterData();
 	Array2D<float> ReliefArray = ChannelRelief.get_RasterData();
+	Array2D<float> DistToBaseline = Swath.get_DistanceToBaseline_ConnectedComponents(ConnectedComponents);
 
 	cout << "Now writing the terrace information to the csv file..." << endl;
 	// loop through all the rows and cols and print some information
@@ -575,14 +576,10 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
   {
     for (int col=0; col<NCols; col++)
     {
-			if (ConnectedComponents_Array[row][col] != NoDataValue && BaselineDistance[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue && ReliefArray[row][col] != NoDataValue)
+			if (ConnectedComponents_Array[row][col] != NoDataValue && BaselineDistance[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue && ReliefArray[row][col] != NoDataValue && DistToBaseline[row][col] != NoDataValue)
 			{
-				//cout << "This row: " << row << " this col: " << col << endl;
-				//cout << "this_cc: " << ConnectedComponents_Array[row][col] << endl;
-				//int this_node = FlowInfo.retrieve_node_from_row_and_column(row, col);
 				float this_elev = ElevationRaster.get_data_element(row,col);
-				//cout << " this_elev: " << this_elev << " this_dist: " << BaselineDistance[row][col] << endl;
-				output_file << ConnectedComponents_Array[row][col] << "," << this_elev << "," << BaselineDistance[row][col] << "," << ReliefArray[row][col] << endl;
+				output_file << ConnectedComponents_Array[row][col] << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
 			}
 		}
 	}
