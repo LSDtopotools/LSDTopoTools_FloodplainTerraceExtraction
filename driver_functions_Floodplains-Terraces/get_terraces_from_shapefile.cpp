@@ -35,13 +35,13 @@ int main (int nNumberofArgs,char *argv[])
     cout << "|| Welcome to the terrace swath tool!  	              ||" << endl;
     cout << "|| This program takes in a baseline shapefile and gets ||" << endl;
 		cout << "|| a swath profile along a channel from it.            ||" << endl;
-		cout << "|| It then extracts the terraces along the channel			||" << endl;
-		cout << "|| using slope and relief thresholds.									||" << endl;
+		cout << "|| It then extracts the terraces along the channel     ||" << endl;
+		cout << "|| using slope and relief thresholds.								  ||" << endl;
     cout << "|| This program was developed by                       ||" << endl;
-    cout << "|| Fiona J. Clubb												              ||" << endl;
+    cout << "|| Fiona J. Clubb                                      ||" << endl;
     cout << "|| at the University of Edinburgh.                     ||" << endl;
 		cout << "|| Was then further developed at the University of     ||" << endl;
-		cout << "|| Minnesota, AMERICAN STYLE.         									||" << endl;
+		cout << "|| Minnesota, AMERICAN STYLE.                          ||" << endl;
     cout << "=========================================================" << endl;
     cout << "This program requires two inputs: " << endl;
     cout << "* First the path to the parameter file." << endl;
@@ -186,7 +186,7 @@ int main (int nNumberofArgs,char *argv[])
 	SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
 	// get the elevation raster from the swath
-	LSDRaster ElevationRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, 0);
+	//LSDRaster ElevationRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, 0);
 
   // get the slope
 	cout << "\t Getting the slope" << endl;
@@ -241,7 +241,7 @@ int main (int nNumberofArgs,char *argv[])
 	string csv_fname = "_terrace_info.csv";
 	string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
 	cout << "The full csv filename is: " << full_csv_name << endl;
-	Terraces.print_TerraceInfo_to_csv(full_csv_name, ElevationRaster, FlowInfo, TestSwath);
+	Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, ChannelRelief, FlowInfo, TestSwath);
 
 	// Done, check how long it took
 	clock_t end = clock();
