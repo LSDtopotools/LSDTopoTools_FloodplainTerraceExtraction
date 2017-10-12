@@ -1467,4 +1467,33 @@ void LSDSwath::write_longitudinal_profile_to_file(LSDRaster& Raster, vector<floa
 
   ofs.close();
 }
+//---------------------------------------------------------------------------//
+// Function to print the baseline of the swath profile to a csv. prints the
+// distance along swath and the elevation of each point.
+// FJC 12/10/17
+//---------------------------------------------------------------------------//
+void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_filename)
+{
+  Array2D<float> ElevationArray = ElevationRaster.get_RasterData();
+
+  // setup the output csv
+  ofstream output_file;
+  output_file.open(csv_filename.c_str());
+  if (!output_file)
+  {
+     cout << "\n Error opening output csv file. Please check your filename";
+     exit(1);
+  }
+  cout << "Opened the csv" << endl;
+
+  output_file << "DistAlongBaseline,Elevation" << endl;
+
+  // loop through and get the values for the csv
+  for (int i = 0; i < int(BaselineRows.size()); i++)
+  {
+    output_file << DistanceAlongBaselineArray[BaselineRows[i]][BaselineCols[i]] << "," << ElevationArray[BaselineRows[i]][BaselineCols[i]] << endl;
+  }
+  output_file.close();
+}
+
 #endif

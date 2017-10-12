@@ -243,6 +243,11 @@ int main (int nNumberofArgs,char *argv[])
 	cout << "The full csv filename is: " << full_csv_name << endl;
 	Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, ChannelRelief, FlowInfo, TestSwath);
 
+	// print the information about the baseline channel to csv
+	string channel_csv_fname = "_baseline_channel_info.csv";
+	cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
+	TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname);
+
 	// Done, check how long it took
 	clock_t end = clock();
 	float elapsed_secs = float(end - begin) / CLOCKS_PER_SEC;
