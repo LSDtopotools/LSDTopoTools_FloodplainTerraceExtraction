@@ -5316,11 +5316,11 @@ void LSDRaster::calculate_roughness_rasters(float window_radius, float roughness
     string remainder_str = itoa(decimal_ten_str);
     string p_str = "p";
     string window_size_str = window_number_str+p_str+remainder_str;
-    
+
     // switch to bil format 09/03/2017
     string DEM_flt_extension = "bil";
-    
-    
+
+
     string underscore = "_";
 
     int roughness_int = int(roughness_radius);
@@ -12895,6 +12895,33 @@ vector< vector<float> > LSDRaster::Sample_Along_Ridge(LSDRaster& Raster1, LSDRas
   Vector_of_Samples.push_back(Sample3);
 
   return Vector_of_Samples;
+}
+
+//-----------------------------------------------------------------------------//
+// Function for converting elevation values in a raster from feet to metres for
+// stupid US imperial measurements
+// WHY WOULD YOU USE FEET?!
+// FJC 16/10/17
+//-----------------------------------------------------------------------------//
+LSDRaster LSDRaster::convert_from_feet_to_metres()
+{
+  Array2D<float> elev_in_metres(NRows,NCols,NoDataValue);
+  double conversion = 0.3048006096012192;
+
+  for (int i = 0; i < NRows; i++)
+  {
+    for (int j = 0; j < NCols; j++)
+    {
+      if (RasterData[i][j] != NoDataValue)
+      {
+        elev_in_metres[i][j] = RasterData[i][j] * conversion;
+      }
+    }
+  }
+
+  LSDRaster output(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,elev_in_metres,GeoReferencingStrings);
+  return output;
+
 }
 
 #endif

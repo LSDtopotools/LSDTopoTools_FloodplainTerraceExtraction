@@ -558,7 +558,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
  }
  cout << "Opened the csv" << endl;
 
-	output_file << "TerraceID,Latitude,Longitude,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
+	output_file << "TerraceID,Latitude,Longitude,X,Y,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
 
 	LSDIndexRaster ConnectedComponents(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,ConnectedComponents_Array,GeoReferencingStrings);
 
@@ -573,6 +573,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 	cout << "Now writing the terrace information to the csv file..." << endl;
 
   // the x and y locations
+	double x_loc, y_loc;
 	double latitude,longitude;
 
   // this is for latitude and longitude
@@ -586,9 +587,10 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 			if (ConnectedComponents_Array[row][col] != NoDataValue && BaselineDistance[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue && ReliefArray[row][col] != NoDataValue && DistToBaseline[row][col] != NoDataValue)
 			{
 				// get the latitude and longitude of the point
+				ElevationRaster.get_x_and_y_locations(row, col, x_loc, y_loc);
 				ElevationRaster.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
 				float this_elev = ElevationRaster.get_data_element(row,col);
-				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
+				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << x_loc << "," << y_loc << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
 			}
 		}
 	}
