@@ -558,7 +558,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
  }
  cout << "Opened the csv" << endl;
 
-	output_file << "TerraceID,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
+	output_file << "TerraceID,Latitude,Longitude,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
 
 	LSDIndexRaster ConnectedComponents(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,ConnectedComponents_Array,GeoReferencingStrings);
 
@@ -571,6 +571,13 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 	Array2D<float> DistToBaseline = Swath.get_DistanceToBaseline_ConnectedComponents(ConnectedComponents);
 
 	cout << "Now writing the terrace information to the csv file..." << endl;
+
+  // the x and y locations
+	double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
 	// loop through all the rows and cols and print some information
 	for (int row=0; row<NRows; row++)
   {
@@ -578,8 +585,10 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
     {
 			if (ConnectedComponents_Array[row][col] != NoDataValue && BaselineDistance[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue && ReliefArray[row][col] != NoDataValue && DistToBaseline[row][col] != NoDataValue)
 			{
+				// get the latitude and longitude of the point
+				ElevationRaster.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
 				float this_elev = ElevationRaster.get_data_element(row,col);
-				output_file << ConnectedComponents_Array[row][col] << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
+				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
 			}
 		}
 	}
