@@ -248,6 +248,10 @@ int main (int nNumberofArgs,char *argv[])
 	cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
 	TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname);
 
+	// print the x and y locations to a csv for bug checking
+	string csv_check = "_terrace_xy_check.csv";
+	ConnectedComponents.FlattenToCSV(csv_check);
+
 	// Done, check how long it took
 	clock_t end = clock();
 	float elapsed_secs = float(end - begin) / CLOCKS_PER_SEC;

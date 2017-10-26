@@ -551,6 +551,8 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 {
 	ofstream output_file;
 	output_file.open(csv_filename.c_str());
+  output_file.precision(8);
+	
 	if (!output_file)
  {
 		 cout << "\n Error opening output csv file. Please check your filename";
@@ -588,6 +590,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 			{
 				// get the latitude and longitude of the point
 				ElevationRaster.get_x_and_y_locations(row, col, x_loc, y_loc);
+				cout << "Row: " << row << " Col: " << col << " X: " << x_loc << " Y: " << y_loc << endl;
 				ElevationRaster.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
 				float this_elev = ElevationRaster.get_data_element(row,col);
 				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << x_loc << "," << y_loc << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
