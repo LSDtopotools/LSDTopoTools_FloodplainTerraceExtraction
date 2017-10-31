@@ -242,29 +242,23 @@ int main (int nNumberofArgs,char *argv[])
 		ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
 
 		cout << "\t Testing connected components" << endl;
-		vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
-
-		// // push back results to file for plotting
-		// ofstream output_file_CC;
-		// string output_fname = "_terrace_swath_plots.txt";
-		// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
-		// for (int i = 0; i < int(CC_vector[0].size()); ++i)
-		// {
-		// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
-		// }
-		// output_file_CC.close();
-
-		// print the terrace information to a csv
-		string csv_fname = "_terrace_info.csv";
-		string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
-		cout << "The full csv filename is: " << full_csv_name << endl;
-		Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, FlowInfo, TestSwath);
-
+		//vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
 
 		// write raster of terrace elevations
 		LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
 		string relief_ext = "_terrace_relief_final";
 		ChannelRelief.write_raster((DATA_DIR+DEM_ID+relief_ext), DEM_extension);
+
+		// print the terrace information to a csv
+		string csv_fname = "_terrace_info.csv";
+		string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
+		cout << "The full csv filename is: " << full_csv_name << endl;
+		Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, ChannelRelief, FlowInfo, TestSwath);
+
+		// print the information about the baseline channel to csv
+		string channel_csv_fname = "_baseline_channel_info.csv";
+		cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
+		TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname);
 	}
 	else
 	{

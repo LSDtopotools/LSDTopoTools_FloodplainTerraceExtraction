@@ -116,8 +116,8 @@ void LSDSwath::create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float
   // with each iteration
   vector<float> DistanceAlongBaseline_temp(NPtsInProfile,NoDataValue);
   vector<float> BaselineValue_temp(NPtsInProfile,NoDataValue);
-	vector<int> BaselineRows(NPtsInProfile,NoDataValue);
-	vector<int> BaselineCols(NPtsInProfile,NoDataValue);
+	vector<int> BaselineRows_temp(NPtsInProfile,NoDataValue);
+	vector<int> BaselineCols_temp(NPtsInProfile,NoDataValue);
   float cumulative_distance = 0;
   DistanceAlongBaseline_temp[0]=cumulative_distance;
   // Retrieve baseline value at each point - sample closest pixel in template raster
@@ -130,8 +130,8 @@ void LSDSwath::create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float
   else
 	{
 		BaselineValue_temp[0] = RasterTemplate.get_data_element(row_point,col_point);
-		BaselineRows[0] = row_point;
-		BaselineCols[0] = col_point;
+		BaselineRows_temp[0] = row_point;
+		BaselineCols_temp[0] = col_point;
 	}
 
 
@@ -153,8 +153,8 @@ void LSDSwath::create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float
     else
 		{
 			BaselineValue_temp[i] = RasterTemplate.get_data_element(row_point,col_point);
-			BaselineRows[i] = row_point;
-			BaselineCols[i] = col_point;
+			BaselineRows_temp[i] = row_point;
+			BaselineCols_temp[i] = col_point;
 		}
   }
 
@@ -410,6 +410,8 @@ void LSDSwath::create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float
   DistanceToBaselineArray = DistanceToBaseline_temp.copy();
   DistanceAlongBaselineArray = ProjectedDistanceAlongBaseline_temp.copy();
   BaselineValueArray = BaselineValueArray_temp.copy();
+  BaselineRows = BaselineRows_temp;
+  BaselineCols = BaselineCols_temp;
 }
 
 void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, float& HalfWidth, float d_space)
@@ -473,8 +475,8 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
   // with each iteration
   vector<float> DistanceAlongBaseline_temp(NPtsInProfile,NoDataValue);
   vector<float> BaselineValue_temp(NPtsInProfile,NoDataValue);
-	vector<int> BaselineRows(NPtsInProfile,NoDataValue);
-	vector<int> BaselineCols(NPtsInProfile,NoDataValue);
+	vector<int> BaselineRows_temp(NPtsInProfile,NoDataValue);
+	vector<int> BaselineCols_temp(NPtsInProfile,NoDataValue);
   float cumulative_distance = 0;
   DistanceAlongBaseline_temp[0]=cumulative_distance;
   // Retrieve baseline value at each point - sample closest pixel in template raster
@@ -487,8 +489,8 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
   else
 	{
 		BaselineValue_temp[0] = RasterTemplate.get_data_element(row_point,col_point);
-		BaselineRows[0] = row_point;
-		BaselineCols[0] = col_point;
+		BaselineRows_temp[0] = row_point;
+		BaselineCols_temp[0] = col_point;
 	}
 
 
@@ -510,8 +512,8 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
     else
 		{
 			BaselineValue_temp[i] = RasterTemplate.get_data_element(row_point,col_point);
-			BaselineRows[i] = row_point;
-			BaselineCols[i] = col_point;
+			BaselineRows_temp[i] = row_point;
+			BaselineCols_temp[i] = col_point;
 		}
   }
 
@@ -767,7 +769,8 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
   DistanceToBaselineArray = DistanceToBaseline_temp.copy();
   DistanceAlongBaselineArray = ProjectedDistanceAlongBaseline_temp.copy();
   BaselineValueArray = BaselineValueArray_temp.copy();
-
+  BaselineRows = BaselineRows_temp;
+  BaselineCols = BaselineCols_temp;
 }
 
 //------------------------------------------------------------------------------
@@ -1479,6 +1482,7 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
   // setup the output csv
   ofstream output_file;
   output_file.open(csv_filename.c_str());
+  output_file.precision(8);
   if (!output_file)
   {
      cout << "\n Error opening output csv file. Please check your filename";
@@ -1486,18 +1490,22 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
   }
   cout << "Opened the csv" << endl;
 
-  output_file << "DistAlongBaseline,Elevation" << endl;
+  output_file << "DistAlongBaseline,Elevation,X,Y,latitude,longitude" << endl;
+  double x_loc, y_loc;
+  double latitude, longitude;
 
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+  cout << "N baseline rows: " << BaselineRows.size() << " N baseline cols: " << BaselineCols.size() << endl;
   // loop through and get the values for the csv
-  for (int row=0; row < NRows; row++)
+  for (int i =0; i < NPtsInProfile; i++)
   {
-    for (int col=0; col < NCols; col++)
-    {
-      if (DistanceAlongBaselineArray[row][col] != NoDataValue && ElevationArray[row][col] != NoDataValue)
-      {
-        output_file << DistanceAlongBaselineArray[row][col] << "," << ElevationArray[row][col] << endl;
-      }
-    }
+    // get the latitude and longitude of the point
+    ElevationRaster.get_x_and_y_locations(BaselineRows[i], BaselineCols[i], x_loc, y_loc);
+    //cout << "Row: " << row << " Col: " << col << " X: " << x_loc << " Y: " << y_loc << endl;
+    ElevationRaster.get_lat_and_long_locations(BaselineRows[i], BaselineCols[i], latitude, longitude, Converter);
+    output_file << DistanceAlongBaseline[i] << "," << BaselineValue[i] << "," << x_loc << "," << y_loc << "," << latitude << "," << longitude << endl;
   }
   output_file.close();
 }
