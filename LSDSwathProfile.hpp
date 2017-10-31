@@ -153,6 +153,9 @@ class LSDSwath
   float get_YMin() const { return YMin; }
   float get_ProfileHalfWidth() const { return ProfileHalfWidth; }
 
+  vector<int> get_BaselineCols() const { return BaselineCols; }
+  vector<int> get_BaselineRows() const { return BaselineRows; }
+
 	protected:
 
   // Swath template
