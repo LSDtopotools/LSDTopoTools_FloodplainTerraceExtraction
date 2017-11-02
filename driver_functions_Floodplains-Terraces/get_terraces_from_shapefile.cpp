@@ -85,6 +85,7 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
+	bool_default_map["write_hillshade"] = false;
 
 	// set default string parameters
 	string_default_map["input_shapefile"] = "NULL";
@@ -146,6 +147,19 @@ int main (int nNumberofArgs,char *argv[])
 		//don't do the filtering, just load the filled DEM
 		LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
 		RasterTemplate = load_DEM;
+	}
+
+	// do you want the hillshade?
+	if (this_bool_map["write_hillshade"])
+	{
+		cout << "Let me print the hillshade for you. " << endl;
+		float hs_azimuth = 315;
+		float hs_altitude = 45;
+		float hs_z_factor = 1;
+		LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+		string hs_fname = DATA_DIR+DEM_ID+"_hs";
+		hs_raster.write_raster(hs_fname,DEM_extension);
 	}
 
 	cout << "\t Flow routing..." << endl;
