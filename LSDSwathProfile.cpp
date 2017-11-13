@@ -1510,4 +1510,35 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
   output_file.close();
 }
 
+//---------------------------------------------------------------------------//
+// Function to print the swath array data to a csv.
+// FJC 13/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::write_array_data_to_csv(string csv_filename)
+{
+  // setup the output csv
+  ofstream output_file;
+  output_file.open(csv_filename.c_str());
+  output_file.precision(8);
+  if (!output_file)
+  {
+     cout << "\n Error opening output csv file. Please check your filename";
+     exit(1);
+  }
+  cout << "Opened the csv" << endl;
+
+  output_file << "row,col,baseline_value,dist_to_baseline_dist_along_baseline" << endl;
+
+  for (int row = 0; row < NRows; row++)
+  {
+    for (int col = 0; col < NCols; col++)
+    {
+      if (DistanceToBaselineArray[row][col] != NoDataValue)
+      {
+        output_file << row << "," << col << "," << BaselineValueArray[row][col] << "," << DistanceToBaselineArray[row][col] << "," << DistanceAlongBaselineArray[row][col] << endl;
+      }
+    }
+  }
+}
+
 #endif

@@ -140,6 +140,7 @@ class LSDSwath
   void write_transverse_profile_to_file(LSDRaster& Raster, vector<float> desired_percentiles, float BinWidth, string prefix, int NormaliseToBaseline);
   void write_longitudinal_profile_to_file(LSDRaster& Raster, vector<float> desired_percentiles, float BinWidth, string prefix, int NormaliseToBaseline);
   void print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_filename);
+  void write_array_data_to_csv(string csv_filename);
   // get functions
   // these get data elements
   int get_NPtsInProfile() const {return NPtsInProfile;}
