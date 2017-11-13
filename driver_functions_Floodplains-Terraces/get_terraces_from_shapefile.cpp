@@ -86,6 +86,7 @@ int main (int nNumberofArgs,char *argv[])
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
 	bool_default_map["write_hillshade"] = false;
+	bool_default_map["load_previous_rasters"] = false;
 
 	// set default string parameters
 	string_default_map["input_shapefile"] = "NULL";
@@ -141,25 +142,25 @@ int main (int nNumberofArgs,char *argv[])
 		 RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
 		 string fill_name = "_filtered";
 		 RasterTemplate.write_raster((DATA_DIR+DEM_ID+fill_name), DEM_extension);
+
+		 // do you want the hillshade?
+		 if (this_bool_map["write_hillshade"])
+		 {
+			 cout << "Let me print the hillshade for you. " << endl;
+			 float hs_azimuth = 315;
+			 float hs_altitude = 45;
+			 float hs_z_factor = 1;
+			 LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+			 string hs_fname = DATA_DIR+DEM_ID+"_hs";
+			 hs_raster.write_raster(hs_fname,DEM_extension);
+		 }
 	}
 	else
 	{
 		//don't do the filtering, just load the filled DEM
 		LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
 		RasterTemplate = load_DEM;
-	}
-
-	// do you want the hillshade?
-	if (this_bool_map["write_hillshade"])
-	{
-		cout << "Let me print the hillshade for you. " << endl;
-		float hs_azimuth = 315;
-		float hs_altitude = 45;
-		float hs_z_factor = 1;
-		LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
-
-		string hs_fname = DATA_DIR+DEM_ID+"_hs";
-		hs_raster.write_raster(hs_fname,DEM_extension);
 	}
 
 	cout << "\t Flow routing..." << endl;
@@ -186,35 +187,59 @@ int main (int nNumberofArgs,char *argv[])
 
 	// now get the junction network
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
-  cout << "\t Got the channel network" << endl;
+	cout << "\t Got the channel network" << endl;
 
-	cout << "\t loading baseline points" << endl;
-	PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
+	LSDRaster SwathRaster;
+	LSDSwath TestSwath;
+	LSDRaster Slope_new;
 
-  cout << "\t Creating swath template" << endl;
-  LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
+	if (this_bool_map["load_previous_rasters"])
+	{
+		// load the previous rasters so you don't have to recalculate everything!
+		string swath_ext = "_swath_raster";
+		LSDRaster SwathRaster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
-	cout << "\n\t Getting raster from swath" << endl;
-	LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
-	string swath_ext = "_swath_raster";
-	SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+		// load the swath object
+		LSDSwath TestSwath(DATA_DIR, RasterTemplate, DEM_ID, FlowInfo);
 
-	// get the elevation raster from the swath
-	//LSDRaster ElevationRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, 0);
+		// get the slope raster
+		string slope_ext = "_slope";
+		LSDRaster Slope_new((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+	}
+	else
+	{
+		cout << "\t loading baseline points" << endl;
+		PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
 
-  // get the slope
-	cout << "\t Getting the slope" << endl;
-  vector<LSDRaster> surface_fitting;
-  LSDRaster Slope;
-  vector<int> raster_selection(8, 0);
-  raster_selection[1] = 1;             // this means you want the slope
-  surface_fitting = RasterTemplate.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_window_radius"], raster_selection);
-  Slope = surface_fitting[1];
+		cout << "\t Creating swath template" << endl;
+		LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
 
-	float mask_threshold = 1.0;
-	bool below = 0;
-	// remove any stupid slope values
-	LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
+		cout << "\n\t Getting raster from swath" << endl;
+		LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
+		string swath_ext = "_swath_raster";
+		SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+
+		// write the swath data to csvs
+		TestSwath.print_swath_data_to_csvs(DEM_ID, FlowInfo,RasterTemplate);
+
+		// get the slope
+		cout << "\t Getting the slope" << endl;
+		vector<LSDRaster> surface_fitting;
+		LSDRaster Slope;
+		vector<int> raster_selection(8, 0);
+		raster_selection[1] = 1;             // this means you want the slope
+		surface_fitting = RasterTemplate.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_window_radius"], raster_selection);
+		Slope = surface_fitting[1];
+
+		float mask_threshold = 1.0;
+		bool below = 0;
+		// remove any stupid slope values
+		LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
+
+		// now save the slope raster in case you need to re-run.
+		string slope_ext = "_slope";
+		Slope_new.write_raster((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+	}
 
 	// get the channel relief and slope threshold using quantile-quantile plots
 	cout << "Getting channel relief threshold from QQ plots" << endl;
@@ -232,19 +257,6 @@ int main (int nNumberofArgs,char *argv[])
 	LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
 	string CC_ext = "_terrace_IDs";
 	ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
-
-	// cout << "\t Testing connected components" << endl;
-	// vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
-	//
-	// // push back results to file for plotting
-	// ofstream output_file_CC;
-	// string output_fname = "_terrace_swath_plots.txt";
-	// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
-	// for (int i = 0; i < int(CC_vector[0].size()); ++i)
-	// {
-	// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
-	// }
-	// output_file_CC.close();
 
 	// write raster of terrace elevations
 	LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
