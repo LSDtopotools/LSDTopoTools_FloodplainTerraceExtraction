@@ -70,6 +70,16 @@ class LSDSwath
   ///
   LSDSwath(vector<float>& Y_X_points, LSDRaster& RasterTemplate, float& HalfWidth, float d_space) { create(Y_X_points, RasterTemplate, HalfWidth, d_space); }
 
+  ///@brief create an LSDSwath from a series of csv files
+  ///@param path the path name
+  ///@param RasterTemplate a lsd raster template, needs to be the same as
+  /// the one originally used to create the swath
+  ///@param DEM_prefix name of the DEM_prefix
+  ///@Param FlowInfo LSDFlowInfo object
+  ///@author FJC
+  ///@date 13/11/17
+  LSDSwath(string path, LSDRaster& RasterTemplate, string DEM_prefix, LSDFlowInfo& FlowInfo) { create(path, RasterTemplate, DEM_prefix, FlowInfo); }
+
   void get_transverse_swath_profile(LSDRaster& Raster, vector<float> desired_percentiles, float BinWidth,
        vector<float>& mid_points, vector<float>& mean_profile, vector<float>& sd_profile, vector< vector<float> >& output_percentile_profiles,
        int NormaliseToBaseline);
@@ -140,7 +150,9 @@ class LSDSwath
   void write_transverse_profile_to_file(LSDRaster& Raster, vector<float> desired_percentiles, float BinWidth, string prefix, int NormaliseToBaseline);
   void write_longitudinal_profile_to_file(LSDRaster& Raster, vector<float> desired_percentiles, float BinWidth, string prefix, int NormaliseToBaseline);
   void print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_filename);
-  void write_array_data_to_csv(string csv_filename);
+  void write_swath_metadata_to_csv(string csv_filename);
+  void write_array_data_to_csv(string csv_filename, LSDFlowInfo& FlowInfo);
+  void print_swath_data_to_csvs(string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster);
   // get functions
   // these get data elements
   int get_NPtsInProfile() const {return NPtsInProfile;}
@@ -185,6 +197,7 @@ class LSDSwath
   void create();
   void create(PointData& ProfilePoints, LSDRaster& RasterTemplate, float ProfileHalfWidth);
   void create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, float& ProfileHalfWidth, float d_space);
+  void create(string path, LSDRaster& RasterTemplate, string DEM_prefix, LSDFlowInfo& FlowInfo);
 
 
 
