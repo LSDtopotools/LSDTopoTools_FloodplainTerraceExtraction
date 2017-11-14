@@ -125,29 +125,48 @@ int main (int nNumberofArgs,char *argv[])
 
 	LSDRaster RasterTemplate;
 
-	if(this_bool_map["Filter topography"])
+	if(this_bool_map["load_previous_rasters"])
 	{
-		 // load the DEM
-		 cout << "Loading the DEM..." << endl;
-		 LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
-		 RasterTemplate = load_DEM;
-
-		 // filter using Perona Malik
-		 int timesteps = 50;
-		 float percentile_for_lambda = 90;
-		 float dt = 0.1;
-		 RasterTemplate = RasterTemplate.PeronaMalikFilter(timesteps, percentile_for_lambda, dt);
-
-		 // fill
-		 RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
-		 string fill_name = "_filtered";
-		 RasterTemplate.write_raster((DATA_DIR+DEM_ID+fill_name), DEM_extension);
+		if (this_bool_map["Filter topography"])
+		{
+			LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
+			RasterTemplate = load_DEM;
+		}
+		else
+		{
+			LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filled"), DEM_extension);
+			RasterTemplate = load_DEM;
+		}
 	}
 	else
 	{
-		//don't do the filtering, just load the filled DEM
-		LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
-		RasterTemplate = load_DEM;
+		if(this_bool_map["Filter topography"])
+		{
+			 // load the DEM
+			 cout << "Loading the DEM..." << endl;
+			 LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
+			 RasterTemplate = load_DEM;
+
+			 // filter using Perona Malik
+			 int timesteps = 50;
+			 float percentile_for_lambda = 90;
+			 float dt = 0.1;
+			 RasterTemplate = RasterTemplate.PeronaMalikFilter(timesteps, percentile_for_lambda, dt);
+
+			 // fill
+			 RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
+			 string fill_name = "_filtered";
+			 RasterTemplate.write_raster((DATA_DIR+DEM_ID+fill_name), DEM_extension);
+		}
+		else
+		{
+			//don't do the filtering, just fill the DEM
+			LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
+			RasterTemplate = load_DEM;
+			RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
+			string fill_name = "_filled";
+			RasterTemplate.write_raster((DATA_DIR+DEM_ID+fill_name), DEM_extension);
+		}
 	}
 
 	// do you want the hillshade?
@@ -189,45 +208,28 @@ int main (int nNumberofArgs,char *argv[])
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 	cout << "\t Got the channel network" << endl;
 
-	LSDRaster SwathRaster;
-	LSDSwath TestSwath;
+	cout << "\t loading baseline points" << endl;
+	PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
+
+	cout << "\t Creating swath template" << endl;
+	LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
+
+	cout << "\n\t Getting raster from swath" << endl;
+	LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
+	string swath_ext = "_swath_raster";
+	SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+
 	LSDRaster Slope_new;
 
 	if (this_bool_map["load_previous_rasters"])
 	{
-		// load the previous rasters so you don't have to recalculate everything!
-		string swath_ext = "_swath_raster";
-		LSDRaster load_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
-
-		// load the swath object
-		LSDSwath load_swath(DATA_DIR, RasterTemplate, DEM_ID, FlowInfo);
-
 		// get the slope raster
 		string slope_ext = "_slope";
 		LSDRaster load_slope((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
-
-		SwathRaster = load_raster;
-		TestSwath = load_swath;
 		Slope_new = load_slope;
 	}
 	else
 	{
-		cout << "\t loading baseline points" << endl;
-		PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
-
-		cout << "\t Creating swath template" << endl;
-		LSDSwath this_swath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
-		TestSwath = this_swath;
-
-		cout << "\n\t Getting raster from swath" << endl;
-		LSDRaster this_swath_raster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
-		SwathRaster = this_swath_raster;
-		string swath_ext = "_swath_raster";
-		SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
-
-		// write the swath data to csvs
-		TestSwath.print_swath_data_to_csvs(DATA_DIR, DEM_ID, FlowInfo,RasterTemplate);
-
 		// get the slope
 		cout << "\t Getting the slope" << endl;
 		vector<LSDRaster> surface_fitting;
