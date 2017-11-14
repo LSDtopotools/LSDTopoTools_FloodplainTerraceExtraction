@@ -37,6 +37,7 @@
 #include "LSDShapeTools.hpp"
 #include "LSDSwathProfile.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDSpatialCSVReader.hpp"
 
 // PCL
 #include <pcl/point_types.h>
@@ -100,7 +101,7 @@ bool test_point_left(vector<float> V_a, vector<float> V_b, vector<float> V_p)
 void LSDSwath::create()
 {
 	cout << "LSDSwathProfile line 102 You need to supply a PointData container of profile coordinates, a raster template and the half width of the profile" << endl;
-	exit(EXIT_FAILURE);
+	//exit(EXIT_FAILURE);
 }
 // This function creates the swath profile template for creating a swath profile
 // of a raster dataset.
@@ -773,6 +774,106 @@ void LSDSwath::create(vector<float>& Y_X_points, LSDRaster& RasterTemplate, floa
   BaselineCols = BaselineCols_temp;
 }
 
+//-----------------------------------------------------------------------//
+// Function to create swath object from csvs - for loading already created
+// swaths
+// FJC 13/11/17
+//-----------------------------------------------------------------------//
+
+void LSDSwath::create(string path, LSDRaster& RasterTemplate, string DEM_prefix, LSDFlowInfo& FlowInfo)
+{
+  // get some info from the tempate raster
+  NRows = RasterTemplate.get_NRows();
+  NCols = RasterTemplate.get_NCols();
+  NoDataValue = RasterTemplate.get_NoDataValue();
+
+  // read in the metadata
+  string metadata_csv = path+DEM_prefix+"_swath_metadata.csv";
+  LSDSpatialCSVReader Metadata(RasterTemplate, metadata_csv);
+
+  // get the metadata info
+  vector<int> temp_int_vec;
+  vector<float> temp_float_vec;
+  // n pts in profile
+  temp_int_vec = Metadata.data_column_to_int("NPtsInProfile");
+  NPtsInProfile = temp_int_vec[0];
+  // profile half width
+  temp_float_vec = Metadata.data_column_to_float("ProfileHalfWidth");
+  ProfileHalfWidth = temp_float_vec[0];
+  // xmin
+  temp_float_vec = Metadata.data_column_to_float("XMin");
+  XMin = temp_float_vec[0];
+  // xmax
+  temp_float_vec = Metadata.data_column_to_float("XMax");
+  XMax = temp_float_vec[0];
+  // ymin
+  temp_float_vec = Metadata.data_column_to_float("YMin");
+  YMin = temp_float_vec[0];
+  // ymax
+  temp_float_vec = Metadata.data_column_to_float("YMax");
+  YMax = temp_float_vec[0];
+
+  // temp vectors n that
+  vector<int> BaselineRows_temp(NPtsInProfile,NoDataValue);
+  vector<int> BaselineCols_temp(NPtsInProfile,NoDataValue);
+  vector<float> DistanceAlongBaseline_temp(NPtsInProfile,NoDataValue);
+  vector<float> BaselineValue_temp(NPtsInProfile,NoDataValue);
+
+  Array2D<float> DistanceToBaselineArray_temp(NRows,NCols,NoDataValue);
+  Array2D<float> DistanceAlongBaselineArray_temp(NRows,NCols,NoDataValue);
+  Array2D<float> BaselineValueArray_temp(NRows,NCols,NoDataValue);
+
+  // read in the array csv
+  string array_csv = path+DEM_prefix+"_swath_arrays.csv";
+  LSDSpatialCSVReader ArrayCSV(RasterTemplate, array_csv);
+  // get the columns to vectors
+  vector<int> array_rows = ArrayCSV.data_column_to_int("row");
+  vector<int> array_cols = ArrayCSV.data_column_to_int("col");
+  vector<int> array_nodes = ArrayCSV.data_column_to_int("node");
+  vector<float> array_baseline_values = ArrayCSV.data_column_to_float("baseline_value");
+  vector<float> array_to_baseline = ArrayCSV.data_column_to_float("dist_to_baseline");
+  vector<float> array_along_baseline = ArrayCSV.data_column_to_float("dist_along_baseline");
+  // now copy the data to the arrays
+  for (int i = 0; i < NRows; i++)
+  {
+    for (int j = 0; j < NCols; j++)
+    {
+      // find where in the vector this node is
+      int this_node = FlowInfo.retrieve_node_from_row_and_column(i,j);
+      vector<int>:: iterator find_it;
+      find_it = find(array_nodes.begin(), array_nodes.end(), this_node);
+      if (find_it != array_nodes.end())
+      {
+          int this_index = distance(array_nodes.begin(), find_it);
+          DistanceToBaselineArray_temp[i][j] = array_to_baseline[this_index];
+          DistanceAlongBaselineArray_temp[i][j] = array_along_baseline[this_index];
+          BaselineValueArray_temp[i][j] = array_baseline_values[this_index];
+      }
+
+    }
+  }
+
+  // read in the baseline csv
+  string baseline_csv = path+DEM_prefix+"_swath_baseline.csv";
+  LSDSpatialCSVReader BaselineCSV(RasterTemplate, baseline_csv);
+  // get the vectors
+  BaselineRows_temp = BaselineCSV.data_column_to_int("row");
+  BaselineCols_temp = BaselineCSV.data_column_to_int("row");
+  DistanceAlongBaseline_temp = BaselineCSV.data_column_to_float("DistAlongBaseline");
+  BaselineValue_temp = BaselineCSV.data_column_to_float("Elevation");
+
+  // now copy temps
+  BaselineRows = BaselineRows_temp;
+  BaselineCols = BaselineCols_temp;
+  BaselineValue = BaselineValue_temp;
+  DistanceAlongBaseline = DistanceAlongBaseline_temp;
+
+  DistanceToBaselineArray = DistanceToBaselineArray_temp;
+  DistanceAlongBaselineArray = DistanceAlongBaselineArray_temp;
+  BaselineValueArray = BaselineValueArray_temp;
+
+}
+
 //------------------------------------------------------------------------------
 // SWATH PROFILE GENERATION
 // These routines take a swath profile template, comprising the LSDSwath object,
@@ -1247,7 +1348,7 @@ Array2D<float> LSDSwath::get_BaselineDist_ConnectedComponents(LSDIndexRaster& Co
       if (CC_array[row][col] != NoDataValue)
       {
         // get the baseline value
-        BaselineDistance[row][col] = BaselineValueArray[row][col];
+        BaselineDistance[row][col] = DistanceAlongBaselineArray[row][col];
       }
     }
   }
@@ -1490,7 +1591,7 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
   }
   cout << "Opened the csv" << endl;
 
-  output_file << "DistAlongBaseline,Elevation,X,Y,latitude,longitude" << endl;
+  output_file << "DistAlongBaseline,Elevation,X,Y,latitude,longitude,row,col" << endl;
   double x_loc, y_loc;
   double latitude, longitude;
 
@@ -1505,9 +1606,96 @@ void LSDSwath::print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_file
     ElevationRaster.get_x_and_y_locations(BaselineRows[i], BaselineCols[i], x_loc, y_loc);
     //cout << "Row: " << row << " Col: " << col << " X: " << x_loc << " Y: " << y_loc << endl;
     ElevationRaster.get_lat_and_long_locations(BaselineRows[i], BaselineCols[i], latitude, longitude, Converter);
-    output_file << DistanceAlongBaseline[i] << "," << BaselineValue[i] << "," << x_loc << "," << y_loc << "," << latitude << "," << longitude << endl;
+    output_file << DistanceAlongBaseline[i] << "," << BaselineValue[i] << "," << x_loc << "," << y_loc << "," << latitude << "," << longitude << "," << BaselineRows[i] << "," << BaselineCols[i] << endl;
   }
   output_file.close();
+}
+
+//---------------------------------------------------------------------------//
+// Function to print the swath array data to a csv.
+// FJC 13/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::write_array_data_to_csv(string csv_filename, LSDFlowInfo& FlowInfo)
+{
+  // setup the output csv
+  ofstream output_file;
+  output_file.open(csv_filename.c_str());
+  output_file.precision(8);
+  if (!output_file)
+  {
+     cout << "\n Error opening output csv file. Please check your filename";
+     exit(1);
+  }
+  cout << "Opened the csv" << endl;
+
+  output_file << "row,col,node,baseline_value,dist_to_baseline,dist_along_baseline" << endl;
+
+  // Define bounding box of swath profile
+  float Resolution = FlowInfo.get_DataResolution();
+  int ColStart = int(floor((XMin)/Resolution));
+  int ColEnd = ColStart + int(ceil((XMax-XMin)/Resolution));
+  ColStart = ColStart - int(ceil(ProfileHalfWidth/Resolution));
+  ColEnd = ColEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (ColStart < 0) ColStart = 0;
+  if (ColEnd > NCols) ColEnd = NCols;
+
+  int RowEnd = NRows - 1 - int(floor(YMin/Resolution));
+  int RowStart = RowEnd - int(ceil((YMax-YMin)/Resolution));
+  RowStart = RowStart - int(ceil(ProfileHalfWidth/Resolution));
+  RowEnd = RowEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (RowEnd > NRows) RowEnd = NRows;
+  if (RowStart < 0) RowStart = 0;
+
+  for (int row = RowStart; row < RowEnd; row++)
+  {
+    for (int col = ColStart; col < ColEnd; col++)
+    {
+      if (DistanceToBaselineArray[row][col] != NoDataValue)
+      {
+        // get the node number
+        int this_node = FlowInfo.retrieve_node_from_row_and_column(row,col);
+        output_file << row << "," << col << "," << this_node << "," << BaselineValueArray[row][col] << "," << DistanceToBaselineArray[row][col] << "," << DistanceAlongBaselineArray[row][col] << endl;
+      }
+    }
+  }
+  output_file.close();
+}
+//---------------------------------------------------------------------------//
+// Function to print the swath metadata to a csv.
+// FJC 13/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::write_swath_metadata_to_csv(string csv_filename)
+{
+  // setup the output csv
+  ofstream output_file;
+  output_file.open(csv_filename.c_str());
+  output_file.precision(8);
+  if (!output_file)
+  {
+     cout << "\n Error opening output csv file. Please check your filename";
+     exit(1);
+  }
+  cout << "Opened the csv" << endl;
+
+  output_file << "NPtsInProfile,ProfileHalfWidth,XMax,XMin,YMax,YMin" << endl;
+  output_file << NPtsInProfile << "," << ProfileHalfWidth << "," << XMax << "," << XMin << "," << YMax << "," << YMin << endl;
+  output_file.close();
+
+}
+//---------------------------------------------------------------------------//
+// Function to print the swath data so it can be read back in if needed to save time
+// NOTE: this doesn't actually save any time!!!!!!!!!!!!!!!
+// FJC 13/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::print_swath_data_to_csvs(string path, string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster)
+{
+  string array_csv = path+csv_prefix+"_swath_arrays.csv";
+  string baseline_csv = path+csv_prefix+"_swath_baseline.csv";
+  string metadata_csv = path+csv_prefix+"_swath_metadata.csv";
+
+  write_array_data_to_csv(array_csv, FlowInfo);
+  print_baseline_to_csv(ElevationRaster, baseline_csv);
+  write_swath_metadata_to_csv(metadata_csv);
 }
 
 #endif
