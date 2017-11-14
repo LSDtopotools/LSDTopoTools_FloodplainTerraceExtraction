@@ -54,5 +54,5 @@ def get_points_along_line(DataDirectory, baseline_shapefile, distance, output_sh
 
 if __name__ == '__main__':
 
-    DataDirectory = '/media/fionaclubb/terrace_lidar/DEMs_for_analysis/Upper_Miss_reach11/'
-    get_points_along_line(DataDirectory,baseline_shapefile='Upper_Miss_baseline_reach11.shp',distance=5,output_shapefile='Upper_Miss_reach11_baseline_points.shp')
+    DataDirectory = '/media/fionaclubb/terrace_lidar/Terrace_experiments/OliviaLSD_test/Line__151109_MC_IW_01__DEM__0017/'
+    get_points_along_line(DataDirectory,baseline_shapefile='Line__151109_MC_IW_01__DEM__0017.shp',distance=0.001,output_shapefile='Line__151109_MC_IW_01__DEM__0017_points.shp')

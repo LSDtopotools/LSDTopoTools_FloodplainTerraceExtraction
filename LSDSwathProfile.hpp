@@ -152,7 +152,7 @@ class LSDSwath
   void print_baseline_to_csv(LSDRaster& ElevationRaster, string csv_filename);
   void write_swath_metadata_to_csv(string csv_filename);
   void write_array_data_to_csv(string csv_filename, LSDFlowInfo& FlowInfo);
-  void print_swath_data_to_csvs(string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster);
+  void print_swath_data_to_csvs(string path, string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster);
   // get functions
   // these get data elements
   int get_NPtsInProfile() const {return NPtsInProfile;}

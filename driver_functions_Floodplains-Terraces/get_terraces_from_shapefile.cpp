@@ -142,25 +142,25 @@ int main (int nNumberofArgs,char *argv[])
 		 RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
 		 string fill_name = "_filtered";
 		 RasterTemplate.write_raster((DATA_DIR+DEM_ID+fill_name), DEM_extension);
-
-		 // do you want the hillshade?
-		 if (this_bool_map["write_hillshade"])
-		 {
-			 cout << "Let me print the hillshade for you. " << endl;
-			 float hs_azimuth = 315;
-			 float hs_altitude = 45;
-			 float hs_z_factor = 1;
-			 LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
-
-			 string hs_fname = DATA_DIR+DEM_ID+"_hs";
-			 hs_raster.write_raster(hs_fname,DEM_extension);
-		 }
 	}
 	else
 	{
 		//don't do the filtering, just load the filled DEM
-		LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
+		LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
 		RasterTemplate = load_DEM;
+	}
+
+	// do you want the hillshade?
+	if (this_bool_map["write_hillshade"])
+	{
+		cout << "Let me print the hillshade for you. " << endl;
+		float hs_azimuth = 315;
+		float hs_altitude = 45;
+		float hs_z_factor = 1;
+		LSDRaster hs_raster = RasterTemplate.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+		string hs_fname = DATA_DIR+DEM_ID+"_hs";
+		hs_raster.write_raster(hs_fname,DEM_extension);
 	}
 
 	cout << "\t Flow routing..." << endl;
@@ -197,14 +197,18 @@ int main (int nNumberofArgs,char *argv[])
 	{
 		// load the previous rasters so you don't have to recalculate everything!
 		string swath_ext = "_swath_raster";
-		LSDRaster SwathRaster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+		LSDRaster load_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
 		// load the swath object
-		LSDSwath TestSwath(DATA_DIR, RasterTemplate, DEM_ID, FlowInfo);
+		LSDSwath load_swath(DATA_DIR, RasterTemplate, DEM_ID, FlowInfo);
 
 		// get the slope raster
 		string slope_ext = "_slope";
-		LSDRaster Slope_new((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+		LSDRaster load_slope((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+
+		SwathRaster = load_raster;
+		TestSwath = load_swath;
+		Slope_new = load_slope;
 	}
 	else
 	{
@@ -212,15 +216,17 @@ int main (int nNumberofArgs,char *argv[])
 		PointData BaselinePoints = LoadShapefile(path_name+this_string_map["input_shapefile"].c_str());
 
 		cout << "\t Creating swath template" << endl;
-		LSDSwath TestSwath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
+		LSDSwath this_swath(BaselinePoints, RasterTemplate, this_float_map["HalfWidth"]);
+		TestSwath = this_swath;
 
 		cout << "\n\t Getting raster from swath" << endl;
-		LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
+		LSDRaster this_swath_raster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
+		SwathRaster = this_swath_raster;
 		string swath_ext = "_swath_raster";
 		SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
 
 		// write the swath data to csvs
-		TestSwath.print_swath_data_to_csvs(DEM_ID, FlowInfo,RasterTemplate);
+		TestSwath.print_swath_data_to_csvs(DATA_DIR, DEM_ID, FlowInfo,RasterTemplate);
 
 		// get the slope
 		cout << "\t Getting the slope" << endl;
@@ -234,11 +240,12 @@ int main (int nNumberofArgs,char *argv[])
 		float mask_threshold = 1.0;
 		bool below = 0;
 		// remove any stupid slope values
-		LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
+		LSDRaster this_slope_raster = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
 
 		// now save the slope raster in case you need to re-run.
 		string slope_ext = "_slope";
-		Slope_new.write_raster((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+		this_slope_raster.write_raster((DATA_DIR+DEM_ID+slope_ext), DEM_extension);
+		Slope_new = this_slope_raster;
 	}
 
 	// get the channel relief and slope threshold using quantile-quantile plots

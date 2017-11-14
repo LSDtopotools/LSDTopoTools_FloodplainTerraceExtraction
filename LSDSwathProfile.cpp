@@ -101,7 +101,7 @@ bool test_point_left(vector<float> V_a, vector<float> V_b, vector<float> V_p)
 void LSDSwath::create()
 {
 	cout << "LSDSwathProfile line 102 You need to supply a PointData container of profile coordinates, a raster template and the half width of the profile" << endl;
-	exit(EXIT_FAILURE);
+	//exit(EXIT_FAILURE);
 }
 // This function creates the swath profile template for creating a swath profile
 // of a raster dataset.
@@ -1630,9 +1630,25 @@ void LSDSwath::write_array_data_to_csv(string csv_filename, LSDFlowInfo& FlowInf
 
   output_file << "row,col,node,baseline_value,dist_to_baseline,dist_along_baseline" << endl;
 
-  for (int row = 0; row < NRows; row++)
+  // Define bounding box of swath profile
+  float Resolution = FlowInfo.get_DataResolution();
+  int ColStart = int(floor((XMin)/Resolution));
+  int ColEnd = ColStart + int(ceil((XMax-XMin)/Resolution));
+  ColStart = ColStart - int(ceil(ProfileHalfWidth/Resolution));
+  ColEnd = ColEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (ColStart < 0) ColStart = 0;
+  if (ColEnd > NCols) ColEnd = NCols;
+
+  int RowEnd = NRows - 1 - int(floor(YMin/Resolution));
+  int RowStart = RowEnd - int(ceil((YMax-YMin)/Resolution));
+  RowStart = RowStart - int(ceil(ProfileHalfWidth/Resolution));
+  RowEnd = RowEnd + int(ceil(ProfileHalfWidth/Resolution));
+  if (RowEnd > NRows) RowEnd = NRows;
+  if (RowStart < 0) RowStart = 0;
+
+  for (int row = RowStart; row < RowEnd; row++)
   {
-    for (int col = 0; col < NCols; col++)
+    for (int col = ColStart; col < ColEnd; col++)
     {
       if (DistanceToBaselineArray[row][col] != NoDataValue)
       {
@@ -1668,18 +1684,49 @@ void LSDSwath::write_swath_metadata_to_csv(string csv_filename)
 }
 //---------------------------------------------------------------------------//
 // Function to print the swath data so it can be read back in if needed to save time
+// NOTE: this doesn't actually save any time!!!!!!!!!!!!!!!
 // FJC 13/11/17
 //---------------------------------------------------------------------------//
-void LSDSwath::print_swath_data_to_csvs(string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster)
+void LSDSwath::print_swath_data_to_csvs(string path, string csv_prefix, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster)
 {
-  string array_csv = csv_prefix+"_swath_arrays.csv";
-  string baseline_csv = csv_prefix+"_swath_baseline.csv";
-  string metadata_csv = csv_prefix+"swath_metadata.csv";
+  string array_csv = path+csv_prefix+"_swath_arrays.csv";
+  string baseline_csv = path+csv_prefix+"_swath_baseline.csv";
+  string metadata_csv = path+csv_prefix+"_swath_metadata.csv";
 
   write_array_data_to_csv(array_csv, FlowInfo);
   print_baseline_to_csv(ElevationRaster, baseline_csv);
   write_swath_metadata_to_csv(metadata_csv);
 }
+
+//---------------------------------------------------------------------------//
+// Function to print the swath data to raster so it can be read back in
+// rather than having to re-run the swath create function.
+// FJC 14/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::print_swath_data_to_rasters(string path, string prefix, LSDFlowInfo& FlowInfo)
+
+//---------------------------------------------------------------------------//
+// Function to pickle the swath data into a binary format which is read by
+// the unpickle function. Stolen from Simon's implementation in FlowInfo.
+// I don't know how much time this is going to save...
+// FJC 14/11/17
+//---------------------------------------------------------------------------//
+void LSDSwath::pickle(string filename)
+{
+  string ext = ".SWpickle";
+  string hdr_ext = ".SWpickle.hdr";
+
+  string hdr_fname = filename+hdr_ext;
+  string data_fname = filename+ext;
+
+  ofstream header_out;
+  header_out.open(hdr_fname.c_str());
+
+  //print the header file
+  header_out << ""
+
+}
+
 
 
 #endif
