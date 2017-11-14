@@ -1698,35 +1698,4 @@ void LSDSwath::print_swath_data_to_csvs(string path, string csv_prefix, LSDFlowI
   write_swath_metadata_to_csv(metadata_csv);
 }
 
-//---------------------------------------------------------------------------//
-// Function to print the swath data to raster so it can be read back in
-// rather than having to re-run the swath create function.
-// FJC 14/11/17
-//---------------------------------------------------------------------------//
-void LSDSwath::print_swath_data_to_rasters(string path, string prefix, LSDFlowInfo& FlowInfo)
-
-//---------------------------------------------------------------------------//
-// Function to pickle the swath data into a binary format which is read by
-// the unpickle function. Stolen from Simon's implementation in FlowInfo.
-// I don't know how much time this is going to save...
-// FJC 14/11/17
-//---------------------------------------------------------------------------//
-void LSDSwath::pickle(string filename)
-{
-  string ext = ".SWpickle";
-  string hdr_ext = ".SWpickle.hdr";
-
-  string hdr_fname = filename+hdr_ext;
-  string data_fname = filename+ext;
-
-  ofstream header_out;
-  header_out.open(hdr_fname.c_str());
-
-  //print the header file
-  header_out << ""
-
-}
-
-
-
 #endif
