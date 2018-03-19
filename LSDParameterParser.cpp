@@ -285,9 +285,9 @@ void LSDParameterParser::parse_file_IO()
     read_fname = RemoveControlCharactersFromEndOfString(read_fname);
     //cout << "Got the write name, it is: "  << write_fname << endl;
   }
-  if(parameter_map.find("CHeads_file") != parameter_map.end())
+  if(parameter_map.find("channel heads fname") != parameter_map.end())
   {
-    CHeads_file = parameter_map["CHeads_file"];
+    CHeads_file = parameter_map["channel heads fname"];
     // get rid of any control characters from the end (if param file was made in DOS)
     CHeads_file = RemoveControlCharactersFromEndOfString(CHeads_file);
     //cout << "Got the channel heads name, it is: " << CHeads_file << endl;
@@ -300,6 +300,36 @@ void LSDParameterParser::parse_file_IO()
   else
   {
     CHeads_file = "NULL";
+  }
+  if(parameter_map.find("baselevel junctions fname") != parameter_map.end())
+  {
+    BaselevelJunctions_file = parameter_map["baselevel junctions fname"];
+    // get rid of any control characters from the end (if param file was made in DOS)
+    BaselevelJunctions_file = RemoveControlCharactersFromEndOfString(BaselevelJunctions_file);
+  }
+  else
+  {
+    BaselevelJunctions_file = "NULL";
+  }
+  if(parameter_map.find("channel segments fname") != parameter_map.end())
+  {
+    ChannelSegments_file = parameter_map["channel segments fname"];
+    // get rid of any control characters from the end (if param file was made in DOS)
+    ChannelSegments_file = RemoveControlCharactersFromEndOfString(ChannelSegments_file);
+  }
+  else
+  {
+    ChannelSegments_file = "NULL";
+  }
+  if(parameter_map.find("floodplain fname") != parameter_map.end())
+  {
+    Floodplain_file = parameter_map["floodplain fname"];
+    // get rid of any control characters from the end (if param file was made in DOS)
+    Floodplain_file = RemoveControlCharactersFromEndOfString(Floodplain_file);
+  }
+  else
+  {
+    Floodplain_file = "NULL";
   }
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -336,6 +366,23 @@ void LSDParameterParser::parse_all_parameters(map<string,float> default_map_f,
   parse_int_parameters(default_map_i);
   parse_bool_parameters(default_map_b);
   parse_string_parameters(default_map_s);
+
+}
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This parses all the default parameter maps.
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParameterParser::parse_all_parameters(map<string,float> default_map_f,
+                      map<string,int> default_map_i, map<string,bool> default_map_b,
+                      map<string,string> default_map_s,
+                      map<string,double> default_map_d)
+{
+  parse_float_parameters(default_map_f);
+  parse_int_parameters(default_map_i);
+  parse_bool_parameters(default_map_b);
+  parse_string_parameters(default_map_s);
+  parse_double_parameters(default_map_d);
+
 }
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -368,6 +415,42 @@ void LSDParameterParser::parse_float_parameters(map<string,float> default_map)
     else  // the key is not in the parsed parameters. Use the default.
     {
       float_parameters[these_keys[i]] = default_map[these_keys[i]];
+      defaults_used_map[these_keys[i]] = dtoa(default_map[these_keys[i]]);
+
+    }
+
+  }
+}
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Parse double parameters (for coords) FJC 20/11/17
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParameterParser::parse_double_parameters(map<string,double> default_map)
+{
+  // the idea is to look through the default map, getting the keys, and then
+  // looking for the keys in the parameter maps
+  vector<string> these_keys = extract_keys(default_map);
+
+  // loop through the keys
+  int n_keys = int(these_keys.size());
+  for(int i = 0; i<n_keys; i++)
+  {
+    cout << "Key is: " << these_keys[i] << endl;
+
+    // If the key is contained in the parsed parameters, use the parsed parameter
+    if(parameter_map.find(these_keys[i]) != parameter_map.end())
+    {
+      cout << "Found key " << these_keys[i];
+
+      // convert the value to float
+      double_parameters[these_keys[i]] = atof(parameter_map[these_keys[i]].c_str());
+      parameters_read_map[these_keys[i]] = parameter_map[these_keys[i]];
+      cout << " it is: " << parameter_map[these_keys[i]] << " check: " << double_parameters[these_keys[i]] << endl;
+
+    }
+    else  // the key is not in the parsed parameters. Use the default.
+    {
+      double_parameters[these_keys[i]] = default_map[these_keys[i]];
       defaults_used_map[these_keys[i]] = dtoa(default_map[these_keys[i]]);
 
     }
@@ -841,7 +924,6 @@ void LSDParameterParser::replace_and_print_parameter_file(string parameter_fname
       params_out << these_keys[i] << ": " << defaults_used_map[these_keys[i]]  << endl;
     }
   }
-
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
