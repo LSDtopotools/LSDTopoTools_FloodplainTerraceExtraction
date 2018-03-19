@@ -45,16 +45,16 @@ def make_q_q_plots(snv1,values1,mn_values1,snv2,values2,mn_values2):
                             count = count+1
                     if (count == min_length):
                         relief_thresh = snv1[i]
-                        print "Relief threshold: ", values1[i]
+                        print ("Relief threshold: ", values1[i])
                     else:
                         flag = 0
    flag = 0
    range2 = np.ptp(values2)
-   print "Slope range: ", range2
+   print ("Slope range: ", range2)
    for i in range(0,len(snv2)):
        if (snv2[i] <= 0):
            frac_diff = abs((values2[i] - mn_values2[i]))/range2
-           print frac_diff
+           print (frac_diff)
            if (frac_diff < threshold):
                 if (flag == 0):
                     flag = 1
@@ -65,11 +65,11 @@ def make_q_q_plots(snv1,values1,mn_values1,snv2,values2,mn_values2):
                             count = count+1
                     if (count == min_length-1):
                         slope_thresh = snv2[i]
-                        print "Slope threshold: ", values2[i]
+                        print ("Slope threshold: ", values2[i])
                     else:
                         flag = 0
-   print relief_thresh
-   print slope_thresh
+   print (relief_thresh)
+   print (slope_thresh)
 
    plt.figure(1, facecolor='White',figsize=[10,5])
    ax1 = plt.subplot(1,2,1)
@@ -100,13 +100,13 @@ def make_q_q_plots(snv1,values1,mn_values1,snv2,values2,mn_values2):
 
 if __name__ == "__main__":
 
-    DataDirectory="/media/fionaclubb/terrace_lidar/DEMs_for_analysis/Upper_Miss_reach11/"
+    DataDirectory="/home/clubb/rahul/"
 
     if not DataDirectory.endswith("/"):
         print("You forgot the '/' at the end of the directory, appending...")
         DataDirectory = DataDirectory+"/"
 
-    DEM_name = 'Upper_Miss_reach11'
+    DEM_name = '3'
     relief_file=DataDirectory+DEM_name+"_qq_relief.txt"
     slope_file=DataDirectory+DEM_name+"_qq_slope.txt"
     OutputName = DataDirectory+DEM_name+"_qq_plots"
