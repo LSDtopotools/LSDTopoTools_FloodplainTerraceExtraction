@@ -211,12 +211,20 @@ class LSDIndexChannel
     /// @date 26/09/2013
 	void append_index_channel_to_index_raster(LSDIndexRaster& old_raster);
 
-	/// @brief Function to get vectors with the X and Y coordinates of nodes in the channel
-	/// @param X_coordinates vector to write X_coords
-	/// @param Y_coordinates vector to write Y_coords
-	/// @author FJC
+  /// @brief Function to get vectors with the X and Y coordinates of nodes in the channel
+  /// @param X_coordinates vector to write X_coords
+  /// @param Y_coordinates vector to write Y_coords
+  /// @author FJC
   /// @date 17/02/17
-	void get_coordinates_of_channel_nodes(vector<double>& X_coordinates, vector<double>& Y_coordinates);
+  void get_coordinates_of_channel_nodes(vector<double>& X_coordinates, vector<double>& Y_coordinates);
+
+  /// @brief Function to get vectors with the X and Y coordinates of nodes in the channel
+  /// @param X_coordinates vector to write X_coords
+  /// @param Y_coordinates vector to write Y_coords
+  /// @author FJC
+  /// @date 17/02/17
+  void get_coordinates_of_channel_nodes(vector<float>& X_coordinates, vector<float>& Y_coordinates);
+
 
 	/// @brief Function to get write index channel to csv
 	/// @param path the path name

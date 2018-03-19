@@ -62,6 +62,7 @@
 #include <cmath>
 #include <ctime>
 #include <map>
+#include <math.h>
 #include "TNT/tnt.h"
 #include "TNT/jama_lu.h"
 #include "LSDStatsTools.hpp"
@@ -71,6 +72,12 @@ using namespace JAMA;
 
 #ifndef StatsTools_CPP
 #define StatsTools_CPP
+
+// Specific fpor KDE estimation implementation
+#define  min_KDE(a,b) (((a)<(b))?(a):(b))
+#define  max_KDE(a,b) (((a)>(b))?(a):(b))
+#define  P_UL 500
+#define  R 1.0
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 /*********************************************************\
@@ -91,6 +98,8 @@ using namespace JAMA;
 #define FAC (1.0/MBIG)
 
 #define ROUGHLY_PI 4
+
+
 
 float ran3(long *idum)
 {
@@ -190,6 +199,20 @@ vector<string> extract_keys(map<string, string> input_map)
   vector<string> retkey;
 
   map<string, string>::iterator it;
+  string key;
+  for(it = input_map.begin(); it != input_map.end(); it++)
+  {
+    key = it->first;
+    retkey.push_back(key);
+  }
+  return retkey;
+}
+
+vector<string> extract_keys(map<string, double> input_map)
+{
+  vector<string> retkey;
+
+  map<string, double>::iterator it;
   string key;
   for(it = input_map.begin(); it != input_map.end(); it++)
   {
@@ -402,6 +425,151 @@ float get_mean(vector<float>& y_data)
   return mean;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the median
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_median(vector<float> y_data)
+{
+  int n_data_points = y_data.size();
+
+  sort(y_data.begin(),y_data.end());
+
+  float dMedian = 0.0;
+  if ( (n_data_points % 2) == 0)
+  {
+    dMedian = ( (y_data[n_data_points/2] + (y_data[(n_data_points/2) - 1]))/2.0 );
+  }
+  else
+  {
+    dMedian = (y_data[n_data_points/2]);
+  }
+
+  return dMedian;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the median, ignore the NoDataValue
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_median(vector<float> y_data, float ndv)
+{
+
+  // First recasting the vector without ndv
+  vector<float> y_data_nndv;
+
+  for(vector<float>::iterator howl = y_data.begin(); howl != y_data.end(); howl ++)
+  {
+    if(*howl != ndv)
+    {
+      y_data_nndv.push_back(*howl);
+    }
+  }
+  int n_data_points = y_data_nndv.size();
+
+  sort(y_data_nndv.begin(),y_data_nndv.end());
+
+  float dMedian = 0.0;
+  if ( (n_data_points % 2) == 0)
+  {
+    dMedian = ( (y_data_nndv[n_data_points/2] + (y_data_nndv[(n_data_points/2) - 1]))/2.0 );
+  }
+  else
+  {
+    dMedian = (y_data_nndv[n_data_points/2]);
+  }
+
+  return dMedian;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the median: uses a pre-sorted vector
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_median_sorted(vector<float> sorted_y_data)
+{
+  int n_data_points = sorted_y_data.size();
+
+  float dMedian = 0.0;
+  if ((n_data_points % 2) == 0)
+  {
+    dMedian = ((sorted_y_data[n_data_points/2] + (sorted_y_data[(n_data_points/2) - 1]))/2.0 );
+  }
+  else
+  {
+    dMedian = (sorted_y_data[n_data_points/2]);
+  }
+
+  return dMedian;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the median absolute deviation (MAD)
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_median_absolute_deviation(vector<float> y_data, float median)
+{
+  int n_data_points = y_data.size();
+  sort(y_data.begin(),y_data.end());
+
+  vector<float> deviations;
+
+  for (int i = 0; i<n_data_points; i++)
+  {
+    deviations.push_back( fabs(median-y_data[i]) );
+  }
+  float MAD = get_median(deviations);
+  return MAD;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets interquartile    NOT FINISHED
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<float> get_IQR_and_median(vector<float> y_data)
+{
+  vector<float> all_the_stats;
+  int n_data_points = y_data.size();
+
+  sort(y_data.begin(),y_data.end());
+
+  float Min = y_data[0];
+  float Max = y_data[n_data_points-1];
+
+  float dMedian = 0.0;
+  float dLQ = 0.0;            // upper quartile
+  float dUQ = 0.0;            // lower quartile
+  if ((n_data_points % 2) == 0)
+  {
+    // the data is even so we get the average of the two middle values.
+    dMedian = ((y_data[n_data_points/2] + (y_data[(n_data_points/2) - 1]))/2.0);
+
+    // each half space contains this many nodes. We need the median of this half space
+    int half_space = n_data_points/2;
+
+    // slice the vector in two
+    vector<float>::iterator first = y_data.begin() + half_space;
+    //vector<float>::iterator last = y_data.begin() + half_space+1;
+    vector<float> First_Slice(y_data.begin(), first);
+    vector<float> Second_Slice(first, y_data.end());
+
+    dLQ = get_median_sorted(First_Slice);
+    dUQ = get_median_sorted(Second_Slice);
+  }
+  else
+  {
+    dMedian = (y_data[n_data_points/2]);
+    int half_space = n_data_points/2;
+    vector<float>::iterator first = y_data.begin() + half_space;
+    vector<float> First_Slice(y_data.begin(), first+1);
+    vector<float> Second_Slice(first, y_data.end());
+
+    dLQ = get_median_sorted(First_Slice);
+    dUQ = get_median_sorted(Second_Slice);
+  }
+
+  all_the_stats.push_back(Min);
+  all_the_stats.push_back(dLQ);
+  all_the_stats.push_back(dMedian);
+  all_the_stats.push_back(dUQ);
+  all_the_stats.push_back(Max);
+
+  return all_the_stats;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // gets the mean from a population of y_data and ignores no data values
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -592,6 +760,71 @@ float Get_Minimum(vector<float>& y_data, float ndv)
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the minimum of a population of data
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+int Get_Minimum(vector<int>& y_data, float ndv)
+{
+  int min = 10000;
+  for (int i =0; i < int(y_data.size()); i++)
+  {
+    if (y_data[i] != ndv)
+    {
+      if (y_data[i] < min)
+      {
+        min = y_data[i];
+      }
+    }
+  }
+  return min;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the index minimum of a population of data
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> Get_Index_Minimum(vector<int>& y_data, float ndv)
+{
+  int min = 10000;
+  vector<int> index;
+  for (int i =0; i < int(y_data.size()); i++)
+  {
+    if (y_data[i] != ndv)
+    {
+      if (y_data[i] < min)
+      {
+        min = y_data[i];
+        index.push_back(i);
+      }
+    }
+  }
+  return index;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the index maximum of a population of data
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+vector<int> Get_Index_Maximum(vector<float>& y_data, float ndv)
+{
+  float max = Get_Maximum(y_data,ndv);
+
+  vector<int> vidx;
+  for(size_t it = 0; it< y_data.size(); it++)
+  {
+    if(y_data[it] != ndv && y_data[it] == max)
+    {
+      vidx.push_back(it);
+    }
+  }
+
+  return vidx;
+
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // gets the maximum of a population of data
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 float Get_Maximum(vector<float>& y_data, float ndv)
@@ -620,6 +853,35 @@ float get_standard_deviation(vector<float>& y_data, float mean)
   for (int i = 0; i< n_data_points; i++)
   {
     total+=(y_data[i]-mean)*(y_data[i]-mean);
+  }
+  return sqrt(total/float(n_data_points));
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the standard deviation from a population of data, ignore no data
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_standard_deviation(vector<float>& y_data, float mean,float ndv)
+{
+  // First recasting the vector without ndv
+  vector<float> y_data_nndv;
+
+  for(vector<float>::iterator howl = y_data.begin(); howl != y_data.end(); howl ++)
+  {
+    if(*howl != ndv)
+    {
+      y_data_nndv.push_back(*howl);
+    }
+  }
+
+
+  int n_data_points = y_data_nndv.size();
+
+
+  float total = 0;
+  for (int i = 0; i< n_data_points; i++)
+  {
+    total+=(y_data_nndv[i]-mean)*(y_data_nndv[i]-mean);
   }
   return sqrt(total/float(n_data_points));
 }
@@ -895,7 +1157,75 @@ void quantile_quantile_analysis_defined_percentiles(vector<float>& data, vector<
   values = vals;
   mn_values = mn_vals;
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function gets all the descriptive stats from a vector of data
+// The data is returned in a vector with elements
+// [0] minimum
+// [1] first quartile (median of first half of data)
+// [2] median
+// [3] third quartile (median of first half of data)
+// [4] maximum
+// [5] mean
+// [6] standard deviation
+// [7] standard error
+// [8] median absolute deviation (MAD)
+vector<float> calculate_descriptive_stats(vector<float>& data)
+{
+  // get the number of data points and set the vector
+  int n_data = int(data.size());
+  vector<float> descriptive_stats;
+
+  // TEMPORARY BUg TRACKER - we'll have to find a solution at some point
+  if(n_data == 0)
+  {
+    cout<< "DEV-DEBUG STATEMENT: LSDStatsTools - calculate_descriptive_stats - void vector feeded" << endl;
+    for(int i = 0;i<9;i++ )
+    {
+      descriptive_stats.push_back(-9999);
+    }
+    return descriptive_stats;
+  }
+  else
+  {
+    // first sort the data
+    sort(data.begin(), data.end());
+
+    float mean = get_mean(data);
+    float std_dev = get_standard_deviation(data, mean);
+    float std_err = get_standard_error(data, std_dev);
+
+    // get the mean and standard deviation
+    float data_sum = 0;
+    for (int i = 0; i<n_data; i++)
+    {
+      data_sum+= data[i];
+    }
+
+    vector<float> IQR = get_IQR_and_median(data);
+    float MAD = get_median_absolute_deviation(data, IQR[2]);
+
+
+    descriptive_stats.push_back(IQR[0]);
+    descriptive_stats.push_back(IQR[1]);
+    descriptive_stats.push_back(IQR[2]);
+    descriptive_stats.push_back(IQR[3]);
+    descriptive_stats.push_back(IQR[4]);
+    descriptive_stats.push_back(mean);
+    descriptive_stats.push_back(std_dev);
+    descriptive_stats.push_back(std_err);
+    descriptive_stats.push_back(MAD);
+
+    return descriptive_stats;
+  }
+
+
+}
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // this function tests for autocorrelation between residuals
@@ -1040,15 +1370,106 @@ float getGaussianRandom(float minimum, float mean, bool allowNegative){
   return mean; // if all else fails return the mean.
 }
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// A bootstrapping method to get the linear regression coefficients
+// Returns a vector with summary statistics
+// [0] minimum
+// [1] first quartile (median of first half of data)
+// [2] median
+// [3] third quartile (median of first half of data)
+// [4] maximum
+// [5] mean
+// [6] standard deviation
+// [7] standard error
+// [8] median absolute deviation (MAD)
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> bootstrap_linear_regression(vector<float>& x_data, vector<float>& y_data, int N_iterations, float acceptance_prob)
+{
+  vector<float> residuals;
+  long seed1 = time(NULL);
+  int N_nodes = int(x_data.size());
+
+  vector<float> regress_slope;
+  vector<float> regress_intercept;
+
+  for(int i = 0; i<N_iterations; i++)
+  {
+    vector<float> this_x;
+    vector<float> this_y;
+    for(int node = 0; node<N_nodes; node++)
+    {
+      float this_prob = ran3(&seed1);
+      //cout << "node: " << node << " ap:" << acceptance_prob << " thisProb = " << this_prob << endl;
+
+      if (this_prob > acceptance_prob)
+      {
+        this_x.push_back( x_data[node]);
+        this_y.push_back( y_data[node]);
+
+        //cout << "x: " << x_data[node] << " y: " << y_data[node] << endl;
+      }
+
+
+
+    }
+    // get the regression
+    vector<float> regress_coeff = simple_linear_regression(this_x, this_y, residuals);
+    regress_slope.push_back(regress_coeff[0]);
+    regress_intercept.push_back(regress_coeff[1]);
+
+    //cout << "RS: " << regress_coeff[0] << " RI: " << regress_coeff[1] << endl;
+
+
+  }
+  // Now the slope and intercept will be contained in regress_slope and regress_intercept
+  // vectors. These can be used to get median and confidence interval numbers.
+  vector<float> descriptive_stats_slope =  calculate_descriptive_stats(regress_slope);
+
+  //cout << "Got the descriptive stats from the bootstrap: " << endl;
+  //cout << "[0] minimum: " << descriptive_stats_slope[0] << endl;
+  //cout << "[1] first quartile: " << descriptive_stats_slope[1] << endl;
+  //cout << "[2] median: " << descriptive_stats_slope[2] << endl;
+  //cout << "[3] third quartile: " << descriptive_stats_slope[3] << endl;
+  //cout << "[4] maximum : " << descriptive_stats_slope[4] << endl;
+  //cout << "[5] mean: " << descriptive_stats_slope[5] << endl;
+  //cout << "[6] standard deviation: " << descriptive_stats_slope[6] << endl;
+  //cout << "[7] standard error: " << descriptive_stats_slope[7] << endl;
+  //cout << "[8] median absolute deviation (MAD): " << descriptive_stats_slope[8] << endl;
+
+  return descriptive_stats_slope;
+
+}
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this gets a simple linear regression where the regression model is y = mx+b
 // it returns a vector with the best fit values for m, b, r^2 and the durban_watson
 // statistic (which is used to test if the residuals are autocorrelated
 // it also replaces the residuals vector with the actual residuals from the
 // best fit
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> simple_linear_regression(vector<float>& x_data, vector<float>& y_data, vector<float>& residuals)
 {
+
+  int n_x = int(x_data.size());
+  int n_y = int(y_data.size());
+
+  if (n_x != n_y)
+  {
+    cout << "WARNING simple_linear_regression x and y vecs no the same size. Prepare for segmentation!" << endl;
+  }
+  if (n_x == 0)
+  {
+    cout << "WARNING simple_linear_regression I haven't got x data! Prepare for segmentation!" << endl;
+  }
+
+
   float rounding_cutoff = 1e-12;
 
   int n_rows = x_data.size();
@@ -1073,46 +1494,62 @@ vector<float> simple_linear_regression(vector<float>& x_data, vector<float>& y_d
   LU<float> LU_mat(LHS);
   Array2D<float> solution= LU_mat.solve(RHS);
 
-  vector<float> soln;
-  for(int i = 0; i<2; i++)
+  if (solution.dim1() == 0)
   {
-    soln.push_back(solution[i][0]);
-  }
-
-  // get some statistics
-  float mean = get_mean(y_data);
-  float SST = get_SST(y_data, mean);
-  // now get the predictions
-  vector<float> predicted;
-  vector<float> temp_residuals;
-
-  // get predicted, residuals, etc
-  float SS_reg = 0;
-  float SS_err = 0;
-  //cout << endl;
-  for(int i = 0; i<n_rows; i++)
-  {
-    predicted.push_back(soln[0]*x_data[i] + soln[1]);
-    temp_residuals.push_back(predicted[i]-y_data[i]);
-    if (fabs(temp_residuals[i]) < rounding_cutoff)
+    cout << "WARNING simple_linear_regression Solution data is empty! Prepare for segmentation!" << endl;
+    cout << "Dimensions are: n_x: " << n_x << " solution matrix: " << solution.dim1() << " " << solution.dim2() << endl;
+    cout << "WARNING: There is an anomaly for this segment and I cannot proceed to the linear regression (Is it a dam ?), I am returning -9999 for m and b chi values"<< endl;
+    vector<float> soln_nodata;
+    for(int i = 0; i<2; i++)
     {
-      temp_residuals[i] = 0;
+      soln_nodata.push_back(-9999);
     }
-    SS_reg+=(predicted[i]-mean)*(predicted[i]-mean);
-
-    SS_err+=temp_residuals[i]*temp_residuals[i];
-
-    //cout << "RESIDUAL, i: " << i << " pred: " << predicted[i] << " data: " << y_data[i] << " resid: " << temp_residuals[i] << endl;
+    return soln_nodata;
   }
 
-  // now get R^2
-  soln.push_back(1 - SS_err/SST);
+  else
+  {
+    vector<float> soln;
+    for(int i = 0; i<2; i++)
+    {
+      soln.push_back(solution[i][0]);
+    }
 
-  // now get the durbin_watson statistic
-  soln.push_back( get_durbin_watson_statistic(temp_residuals) );
+    // get some statistics
+    float mean = get_mean(y_data);
+    float SST = get_SST(y_data, mean);
+    // now get the predictions
+    vector<float> predicted;
+    vector<float> temp_residuals;
 
-  residuals = temp_residuals;
-  return soln;
+    // get predicted, residuals, etc
+    float SS_reg = 0;
+    float SS_err = 0;
+    //cout << endl;
+    for(int i = 0; i<n_rows; i++)
+    {
+      predicted.push_back(soln[0]*x_data[i] + soln[1]);
+      temp_residuals.push_back(predicted[i]-y_data[i]);
+      if (fabs(temp_residuals[i]) < rounding_cutoff)
+      {
+        temp_residuals[i] = 0;
+      }
+      SS_reg+=(predicted[i]-mean)*(predicted[i]-mean);
+
+      SS_err+=temp_residuals[i]*temp_residuals[i];
+
+      //cout << "RESIDUAL, i: " << i << " pred: " << predicted[i] << " data: " << y_data[i] << " resid: " << temp_residuals[i] << endl;
+    }
+
+    // now get R^2
+    soln.push_back(1 - SS_err/SST);
+
+    // now get the durbin_watson statistic
+    soln.push_back( get_durbin_watson_statistic(temp_residuals) );
+
+    residuals = temp_residuals;
+    return soln;
+  }
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1137,6 +1574,48 @@ void least_squares_linear_regression(vector<float> x_data,vector<float> y_data, 
   gradient = SS_xy/SS_xx;
   intercept = y_mean - gradient*x_mean;
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// orthogonal linear regression
+// 01/04/2017 SMM No foolin
+// This comes from davegiles.blogspot.co.uk/2014/11/orthogonal-regression-first-steps.html
+// NOTE: THis is more generally called Total Least Squares
+//  There is a solution using matrices that is probably compuationally faster
+//  Might want to implement that in the future if this is slow
+//  Note R^2 comes from the simple least squares
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> orthogonal_linear_regression( vector<float>& x_data, vector<float>& y_data, float& intercept, float& gradient, float& R_squared)
+{
+  vector<float> means(2,0.0);
+
+  float SS_xx=0;
+  float SS_yy=0;
+  float SS_xy=0;
+  float x_mean = get_mean(x_data);
+  float y_mean = get_mean(y_data);
+  //float n_nodes = float(x_data.size());
+  for(int i = 0; i<int(x_data.size()); ++i)
+  {
+    SS_xx += (x_data[i]-x_mean)*(x_data[i]-x_mean);
+    SS_yy += (y_data[i]-y_mean)*(y_data[i]-y_mean);
+    SS_xy += (x_data[i]-x_mean)*(y_data[i]-y_mean);
+  }
+  // This isn't needed since the (n_nodes-1) cancels out.
+  //SS_xx = SS_xx/(n_nodes-1);
+  //SS_yy = SS_yy/(n_nodes-1);
+  //SS_xy = SS_xy/(n_nodes-1);
+
+  gradient = (SS_yy-SS_xx+sqrt( (SS_yy-SS_xx)*(SS_yy-SS_xx)+ 4*SS_xy*SS_xy ))/(2*SS_xy);
+  intercept = y_mean - gradient*x_mean;
+
+  means[0] = x_mean;
+  means[1]= y_mean;
+  R_squared = SS_xy*SS_xy/(SS_xx*SS_yy);
+  return means;
+
+}
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1453,20 +1932,22 @@ double interp2D_bilinear(vector<double>& x_locs, vector<double>& y_locs, Array2D
     // reverse to positive order if reversed
     if( x_locs[0] > x_locs[1])
     {
+      //cout << "Reversing x" << endl;
       is_x_reversed = true;
       reverse(x_locs.begin(),x_locs.end());
     }
     if( y_locs[0] > y_locs[1])
     {
+      //cout << "Reversing y" << endl;
       is_y_reversed = true;
       reverse(y_locs.begin(),y_locs.end());
     }
 
-
     // first find the index of the x data
     if(x_interp < x_locs[0])
     {
-      cout << "x is too small for 2D interpolation, defaulting to ndv";
+      cout << "x is too small for 2D interpolation, defaulting to ndv" << endl;
+      cout << "x_locs[0]" << x_locs[0] << " x interp: " << x_interp << endl;
       x_index = ndv_index;
     }
     else if (x_interp > x_locs[n_xlocs-1])
@@ -1490,7 +1971,8 @@ double interp2D_bilinear(vector<double>& x_locs, vector<double>& y_locs, Array2D
     // now get the index of the y data
     if(y_interp < y_locs[0])
     {
-      cout << "y is too small for 2D interpolation, defaulting to ndv";
+      cout << "y is too small for 2D interpolation, defaulting to ndv" << endl;
+      cout << "y_locs[0]" << y_locs[0] << " y interp: " << y_interp << endl;
       y_index = ndv_index;
     }
     else if (y_interp > y_locs[n_ylocs-1])
@@ -2233,8 +2715,141 @@ vector< vector < vector<int> > > partition_driver_to_vecvecvec(int k, int minimu
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This returns combinations. It prints to screen.
+// The vector v is empty; it is used for storing data.
+// We using n choose Maxk (so say, 10 integers in combos of three means n = 10, k =3)
+// Maxk is the maximum numer of integers you use.
+// from
+// http://www.cs.utexas.edu/users/djimenez/utsa/cs3343/lecture25.html
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void combinations (vector<int> v, int start, int n, int k, int maxk)
+{
+  int i;
+  if (int(v.size()) <= maxk)
+  {
+    cout << "FATAL ERROR your vector is too small for combinations (LSDStatsTools)" << endl;
+    cout << "This error can come from numerous parameters, there is probably an error within your river network detection, where I cannot find valid river/basins" << endl;
+    cout << "Check for instance if your threshold_pixel is significantly lower than your minimum_basin_size, but also that your minimum, is significantly lower than the maximum_basin_size" << endl;
+    cout << "I am now exiting, sorry." << endl;
+    exit(EXIT_FAILURE);
+  }
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // k here counts through positions in the maxk-element v.
+  //if k > maxk, then the v is complete and we can use it.
+  if (k > maxk)
+  {
+    //insert code here to use combinations as you please */
+    //cout << "maxk is: " << maxk << endl;
+    for (i=1; i<=maxk; i++)
+    {
+      cout << v[i] << " ";
+    }
+    cout << endl;
+    return;
+  }
+
+  // for this k'th element of the v, try all start..n
+  //elements in that position
+  for (i=start; i<=n; i++)
+  {
+    v[k] = i;
+
+    // recursively generate combinations of integers
+    // from i+1..n
+    combinations (v, i+1, n, k+1, maxk);
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This returns combinations. It prints to screen.
+// The vector v is empty; it is used for storing data.
+// We using n choose Maxk (so say, 10 integers in combos of three means n = 10, k =3)
+// Maxk is the maximum numer of integers you use.
+// from
+// http://www.cs.utexas.edu/users/djimenez/utsa/cs3343/lecture25.html
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void combinations (vector<int> v, int start, int n, int k, int maxk, vector<vector <int> >& these_combinations)
+{
+
+  int i;
+  if (int(v.size()) <= maxk)
+  {
+    cout << "FATAL ERROR your vector is too small for combinations (LSDStatsTools)" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // k here counts through positions in the maxk-element v.
+  //if k > maxk, then the v is complete and we can use it.
+  if (k > maxk)
+  {
+    //insert code here to use combinations as you please */
+    //cout << "maxk is: " << maxk << endl;
+    vector<int> this_combo;
+    for (i=1; i<=maxk; i++)
+    {
+      this_combo.push_back( v[i]);
+    }
+    these_combinations.push_back(this_combo);
+    return;
+  }
+
+  // for this k'th element of the v, try all start..n
+  //elements in that position
+  for (i=start; i<=n; i++)
+  {
+    v[k] = i;
+
+    // recursively generate combinations of integers
+    // from i+1..n
+    combinations (v, i+1, n, k+1, maxk,these_combinations);
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This just takes two inputs, the number of integers (starting from 1) and
+// the "choose" variable (k)
+vector< vector<int> > combinations(int n, int k, bool zero_indexed)
+{
+
+  vector< vector<int> > combovecvec;
+  vector<int> v(n+1);
+
+  combinations(v, 1, n, 1, k,combovecvec);
+
+  // Flag for zero indexing. A stupid, brute force way to do it but it works
+  if (zero_indexed)
+  {
+    for(int i = 0; i< int(combovecvec.size()); i++)
+    {
+      for(int j = 0; j<k; j++)
+      {
+        combovecvec[i][j] = combovecvec[i][j]-1;
+      }
+    }
+  }
+
+
+  // print results for bug checking
+  //for(int i = 0; i< int(combovecvec.size()); i++)
+  //{
+  //  for(int j = 0; j<k; j++)
+  //  {
+  //    cout << combovecvec[i][j] << " ";
+  //  }
+  //  cout << endl;
+  //}
+  return combovecvec;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // an integer partition algorithm
 // Algorithm and original Pascal implementation: Frank Ruskey, 1995.
 // Translation to C: Joe Sawada, 1997
@@ -2260,11 +2875,11 @@ void integer_partition(int n, int k, int t, vector<int>& p)
     integer_partition (n-k,j,t+1, p);
   }
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // an integer partition algorithm
 // Algorithm and original Pascal implementation: Frank Ruskey, 1995.
 // Translation to C: Joe Sawada, 1997
@@ -2276,7 +2891,7 @@ void integer_partition(int n, int k, int t, vector<int>& p)
 // Skiena, S. Implementing Discrete Mathematics: Combinatorics and Graph Theory with Mathematica. Reading, MA: Addison-Wesley, 1990.
 // this is a further adaptation that only presents solution to the partition
 // with segments of a minimum length
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void partitions_with_minimum_length(int n, int k, int t, int min_length, vector<int>& p)
 {
 
@@ -3517,6 +4132,24 @@ float calculate_MLE_from_residuals(vector<float>& residuals, float sigma)
   return MLE_tot;
 }
 
+// get the least squared maximum likelihood estimator based on residuals
+float calculate_RMSE_from_residuals(vector<float>& residuals)
+{
+  //cout << "sigma is: " << sigma << endl;
+
+  // get the number of samples
+  int n_samples = residuals.size();
+  float inv_samp = 1/float(n_samples);
+  float sum = 0;
+  for (int i = 0; i<n_samples; i++)
+  {
+    sum+=sqrt(residuals[i]*residuals[i]);
+  }
+  float RMSE = sum*inv_samp;
+  return RMSE;
+}
+
+
 string itoa(int num)
 {
     stringstream converter;
@@ -3917,12 +4550,14 @@ void log_bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, floa
 //FC 13/11/12; modified by DM 04/12/12
 // WARNING - will not work on vectors with negative values (e.g. hilltop curvature). If using
 // vector of negative values take the absolute values before passing to function.
-//
+// UPDATE: Works on negative values
 // Modified by FC 30/09/13 to calculate the range of the 95th percentile for each bin -
 // used for channel head prediction through chi segment fitting.  Changed from log binning to
 // regular binning.
 // Modified by FC 13/01/13 to calculate the median of each bin and return the standard error.
 //
+// SMM comment: can this do negative values now??
+//  Also, do we need bin_lower_limit? 31/05/2017
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bin_width,
                   vector<float>&  MeanX_output, vector<float>& MeanY_output,
@@ -3937,7 +4572,7 @@ void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bi
   float max_X = InputVectorX[n_data-1];
   float min_X = InputVectorX[1];
 
-  cout << "LSDStatsTools line 1757, n_data_X: " << InputVectorX.size() << " and Y: " << InputVectorY.size() << endl;
+  //cout << "LSDStatsTools line 1757, n_data_X: " << InputVectorX.size() << " and Y: " << InputVectorY.size() << endl;
 
   for (int i = 0; i < n_data; ++i)
   {
@@ -3959,7 +4594,7 @@ void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bi
     lower_limit = 0;
   }
   int NBins = int( (upper_limit - lower_limit)/bin_width )+1;
-  cout << "Upper limit: " << upper_limit << " Lower limit: " << lower_limit << " NBins: " << NBins << endl;
+  //cout << "Upper limit: " << upper_limit << " Lower limit: " << lower_limit << " NBins: " << NBins << endl;
 
   // Looping through all the rows and columns and calculating which bin the
   // contributing area is in, and putting the slope in this bin
@@ -4072,7 +4707,11 @@ void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bi
       //find the median of the dependent variable Y
       sort(YDataVector.begin(), YDataVector.end());
       int YDataSize = YDataVector.size();
-      MedianY.push_back(YDataVector[floor(YDataSize/2)]);
+      //cout << "Median calculation, Y size: " << YDataSize << endl;
+      //cout << "Element of median: " << floor(YDataSize/2) << endl;
+      //cout << "Median is: " << YDataVector[floor(YDataSize/2)] << endl;
+      MedianY[bin_id] = YDataVector[floor(YDataSize/2)];
+
     }
   }
 
@@ -4100,6 +4739,240 @@ void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bi
   StandardErrorY_output = StandardErrorY;
   number_observations_output = number_observations;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// BINNING OF 1D VECTOR
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Takes vectors for two corresponding variables (e.g. drainage area and slope)
+// and sorts into bins of a specified bin width.
+// The inputs are:
+//    - InputVectorX = the independent variable (usually plotted on the x axis)
+//    - InputVectorY = the dependent variable (usually plotted on the y axis)
+//    - bin_width = the width of the bins, with respect to
+//          InputArrayX
+//
+// This includes a number of extra statistics for the dependent variable
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void bin_data(vector<float>& InputVectorX, vector<float>& InputVectorY, float bin_width,
+              vector<float>& midpoints_output, vector<float>&  MeanX_output,
+              vector<float>&  MedianX_output, vector<float>&  StandardDeviationX_output,
+              vector<float>& StandardErrorX_output, vector<float>& MADX_output,
+              vector<float>& MeanY_output, vector<float>& MinimumY_output,
+              vector<float>& FirstQuartileY_output, vector<float>& MedianY_output,
+              vector<float>& ThirdQuartileY_output, vector<float>& MaximumY_output,
+              vector<float>&  StandardDeviationY_output, vector<float>& StandardErrorY_output,
+              vector<float>& MADY_output, vector<int>& number_observations_output,
+              float NoDataValue)
+
+{
+
+  // Finding max contributing area to use as upper limit for the bins
+  int n_data = InputVectorY.size();
+  float max_X = InputVectorX[n_data-1];
+  float min_X = InputVectorX[1];
+
+  //cout << "LSDStatsTools line 1757, n_data_X: " << InputVectorX.size() << " and Y: " << InputVectorY.size() << endl;
+
+  for (int i = 0; i < n_data; ++i)
+  {
+    if (InputVectorX[i] > max_X)
+    {
+      max_X = InputVectorX[i];
+    }
+    if (InputVectorX[i] < min_X || min_X == 0)    // Cannot have take a logarithm of zero.
+    {
+      min_X = InputVectorX[i];
+    }
+  }
+
+  // Defining the upper limit, lower limit and width of the bins
+  float upper_limit = ceil(max_X/bin_width)*bin_width;
+  float lower_limit = floor(min_X/bin_width)*bin_width;
+  if (lower_limit < 0 || isnan(lower_limit) == 1)
+  {
+    lower_limit = 0;
+  }
+  int NBins = int( (upper_limit - lower_limit)/bin_width )+1;
+  //cout << "Upper limit: " << upper_limit << " Lower limit: " << lower_limit << " NBins: " << NBins << endl;
+
+  // Looping through all the rows and columns and calculating which bin the
+  // contributing area is in, and putting the slope in this bin
+  vector<int> number_observations(NBins,0);
+  vector<float> Y_data(NBins,0.0);
+  vector<float> X_data(NBins,0.0);
+
+  // These will be copied into their respective function output vectors
+  vector<float> MeanX(NBins,0.0);
+  vector<float> MeanY(NBins,0.0);
+  vector<float> mid_points(NBins,0.0);
+
+  // vector<vector> objects house data in each bin.
+  vector< vector<float> > binned_data_X;
+  vector< vector<float> > binned_data_Y;
+
+  // create the vector of vectors.  Nested vectors will store data within that
+  // bin.
+  vector<float> empty_vector;
+  for(int i = 0; i<NBins; i++)
+  {
+    binned_data_X.push_back(empty_vector);
+    binned_data_Y.push_back(empty_vector);
+  }
+
+  // Bin Data
+  for (int i = 0; i < n_data; ++i)
+  {
+    float Y = InputVectorY[i];
+    if (Y != NoDataValue)
+    {
+      float X = InputVectorX[i];
+      if (X != 0)
+      {
+        // Get bin_id for this particular value of X
+        int bin_id = int((X-lower_limit)/bin_width);
+        //cout << "X: " << X << " Y: " << Y << " bin_id: " << bin_id << endl;
+        if (bin_id >= 0)
+        {
+          //cout << "LINE 1818, bin id: " << bin_id << " i: " << i << " XDsz: " << X_data.size() << " YDsz: " << Y_data.size() << endl;
+          //cout << "LINE 1819, bdxsz: " << binned_data_X.size() << " bdysz: " << binned_data_Y.size() << endl << endl;
+          // Store X and corresponding Y into this bin, for their respective
+          // vector<vector> object
+          binned_data_X[bin_id].push_back(X);
+          binned_data_Y[bin_id].push_back(Y);
+          Y_data[bin_id] += Y;
+          X_data[bin_id] += X;
+          ++number_observations[bin_id];
+        }
+      }
+    }
+  }
+
+
+  // Calculating the midpoint in x direction of each bin and the mean of x and y
+  // in each bin.  Probably want to plot MeanX vs MeanY, rather than midpoint of
+  // x vs Mean Y to be most robust.  At the moment the program returns both.
+  float midpoint_value = lower_limit + bin_width/2;
+  for (int bin_id = 0; bin_id < NBins; bin_id++)
+  {
+    mid_points[bin_id] = midpoint_value;
+    midpoint_value = midpoint_value + bin_width;
+    if (number_observations[bin_id] != 0)
+    {
+      MeanY[bin_id] = Y_data[bin_id]/number_observations[bin_id];
+      MeanX[bin_id] = X_data[bin_id]/number_observations[bin_id];
+      //cout << "No observations in bin: " << number_observations[bin_id] << endl;
+    }
+  }
+
+
+  // These will be copied into their respective function output vectors
+  vector<float> MinimumY(NBins,0.0);
+  vector<float> FirstQuartileY(NBins,0.0);
+  vector<float> MedianY(NBins,0.0);
+  vector<float> ThirdQuartileY(NBins,0.0);
+  vector<float> MaximumY(NBins,0.0);
+  vector<float> StandardDeviationY(NBins,0.0);
+  vector<float> StandardErrorY(NBins,0.0);
+  vector<float> MADY(NBins,0.0);
+
+
+  vector<float> MedianX(NBins,0.0);
+  vector<float> StandardDeviationX(NBins,0.0);
+  vector<float> StandardErrorX(NBins,0.0);
+  vector<float> MADX(NBins,0.0);
+
+  vector<float> this_binned_X;
+  vector<float> this_binned_Y;
+  // Getting the standard deviation of each bin.  First get sum of the squared
+  // deviations from the mean
+  for (int bin_id = 0; bin_id < NBins; bin_id++)
+  {
+    if (number_observations[bin_id] != 0)
+    {
+      this_binned_X = binned_data_X[bin_id];
+      this_binned_Y = binned_data_Y[bin_id];
+
+      vector<float> descriptive_stats_X = calculate_descriptive_stats(this_binned_X);
+      vector<float> descriptive_stats_Y = calculate_descriptive_stats(this_binned_Y);
+
+      // get stats for Y data
+      MinimumY[bin_id] = descriptive_stats_Y[0];
+      FirstQuartileY[bin_id] = descriptive_stats_Y[1];
+      MedianY[bin_id] = descriptive_stats_Y[2];
+      ThirdQuartileY[bin_id] = descriptive_stats_Y[3];
+      MaximumY[bin_id] = descriptive_stats_Y[4];
+      StandardDeviationY[bin_id] = descriptive_stats_Y[6];
+      StandardErrorY[bin_id] = descriptive_stats_Y[7];
+      MADY[bin_id] = descriptive_stats_Y[8];
+
+      // Get stats for X data
+      MedianX[bin_id] = descriptive_stats_X[2];
+      StandardDeviationX[bin_id] = descriptive_stats_X[6];
+      StandardErrorX[bin_id] = descriptive_stats_X[7];
+      MADX[bin_id] = descriptive_stats_X[8];
+
+
+
+    }
+  }
+
+
+
+  // Copy output into output vectors
+  midpoints_output = mid_points;
+  MeanX_output = MeanX;
+  MedianX_output = MedianX;
+  StandardDeviationX_output = StandardDeviationX;
+  StandardErrorX_output = StandardErrorX;
+  MADX_output = MADX;
+
+  MeanY_output = MeanY;
+  MinimumY_output = MinimumY;
+  FirstQuartileY_output = FirstQuartileY;
+  MedianY_output = MedianY;
+  ThirdQuartileY_output = ThirdQuartileY;
+  MaximumY_output = MaximumY;
+  StandardDeviationY_output = StandardDeviationY;
+  StandardErrorY_output = StandardErrorY;
+  MADY_output = MADY;
+
+  number_observations_output = number_observations;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //look for bins with very few (or no) data points output from the log binning function and removes them to avoid
@@ -4803,8 +5676,8 @@ double rad(double degree)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // conversion from radians to degrees - SWDG 12/12/13
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 float deg(float radians)
 {
   float pi = 3.14159265;
@@ -4818,7 +5691,218 @@ double deg(double radians)
   return (radians/M_PI)*deg;
 }
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get the angle between two vectors in radians
+// These vectors are mathematical vectors with a starting point at 0,0.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float angle_between_vectors(float x1, float y1, float x2, float y2)
+{
+  float dot = x1*x2 + y1*y2;      // dot product
+  float det = x1*y2 - y1*x2;      // determinant
+  float angle = atan2(det, dot);
+  return angle;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get the angle between the vector between points (x1, y1) and (x2, y2) and a reference vector pointing N in a clockwise direction
+// FJC 11/01/18
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float clockwise_angle_between_vector_and_north(float x1, float y1, float x2, float y2)
+{
+  float pi = 3.14159265;
+  float angle;
+  float vector_x = x2-x1;
+  float vector_y = y2-y1;
+
+  float len_vector = hypot(vector_x, vector_y);
+
+  // no angle if len_vector = 0
+  if (len_vector == 0) { angle = 0; }
+
+  // normalise vector: v/||v||
+  float normalised_x = vector_x/len_vector;
+  float normalised_y = vector_y/len_vector;
+
+  // reference vector [0,1]
+  float ref_x = 0;
+  float ref_y = 1;
+
+  float dot = normalised_x*ref_x + normalised_y*ref_y;      // dot product
+  float det = normalised_x*ref_y - normalised_y*ref_x;      // determinant
+  angle = atan2(det, dot);
+
+  // counter clockwise, subtract from 2*pi (360 degrees)
+  if (angle < 0)
+  {
+    angle = (2*pi)+angle;
+  }
+
+  return angle;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get the angle between the vector between points (x1, y1) and (x2, y2) and a reference vector pointing N in a clockwise direction
+// FJC 11/01/18
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float clockwise_angle_between_two_vectors(float x0, float y0, float x1, float y1, float x2, float y2)
+{
+  float pi = 3.14159265;
+  float angle, new_angle;
+
+  float vector1_x = x1-x0;
+  float vector1_y = y1-y0;
+
+  float vector2_x = x2-x0;
+  float vector2_y = y2-y0;
+
+  if (vector1_x == vector2_x && vector1_y == vector2_y) { angle = 0; }
+
+  float dot = vector1_x*vector2_x + vector1_y*vector2_y;      // dot product
+  float det = vector1_x*vector2_y - vector1_y*vector2_x;      // determinant
+  angle = atan2(det, dot);
+
+  // counter clockwise, subtract from 2*pi (360 degrees)
+  if (angle < 0)
+  {
+    new_angle = (2*pi)+angle;
+  }
+
+  return angle;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get the angle between two vectors in radians
+// We need to calculate the (x1,y1) and (x2,y2) coordinates by moving
+// the vectors to intercept (0,0)
+// the bool vectors_point_downstream is true if the vector's first element is the
+// upstream node in a channel and false if the first node is downstream.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float angle_between_two_vector_datasets(vector<float>& x1_data, vector<float>& y1_data,
+                                        vector<float>& x2_data, vector<float>& y2_data,
+                                        bool vectors_point_downstream)
+{
+  vector<float> v1_floats = get_directional_vector_coords_from_dataset(x1_data, y1_data, vectors_point_downstream);
+  vector<float> v2_floats = get_directional_vector_coords_from_dataset(x2_data, y2_data, vectors_point_downstream);
+
+  float angle = angle_between_vectors(v1_floats[0], v1_floats[1], v2_floats[0], v2_floats[1]);
+
+  return angle;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function takes x and y data as vectors and returns a 2 element vector
+// where the 0 element is the x1 component of a directional vector
+// and the 1 element is the y1 component of a directional vector
+// vector vector vector, Victor.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> get_directional_vector_coords_from_dataset(vector<float> x_data, vector<float>& y_data,
+                      bool vectors_point_downstream)
+{
+  // if the vectors point downstream we need to reverse the order of the nodes.
+  if (vectors_point_downstream)
+  {
+    reverse(x_data.begin(),x_data.end());
+    reverse(y_data.begin(),y_data.end());
+  }
+
+  // get the vector intercept and slopes
+  float intercept, gradient, R2;
+  vector<float> vector_mean = orthogonal_linear_regression( x_data, y_data, intercept, gradient, R2);
+
+  //cout << endl << "===================" << endl << "I am getting vector coords." << endl;
+  //cout << "Gradient is: " << gradient << endl;
+
+
+  float x1,y1;
+  int quadrant = -99;   // this is for bug checking
+  // quadrants are
+  // 4 | 1
+  // -----
+  // 3 | 2
+
+  // now we go through a lot of tedious logic to figure out which direction
+  // the vector is pointing
+  if( vector_mean[0] > x_data[0] )
+  {
+    if ( vector_mean[1] > y_data[0])
+    {
+      quadrant = 1;
+      x1 = 1.0;
+      if(gradient > 0)
+      {
+        y1 = gradient;
+
+      }
+      else
+      {
+        y1 = -gradient;
+
+      }
+    }
+    else
+    {
+      x1 = 1.0;
+      quadrant = 2;
+      if(gradient > 0)
+      {
+        y1 = -gradient;
+      }
+      else
+      {
+        y1 = gradient;
+      }
+    }
+  }
+  else
+  {
+    if ( vector_mean[1] > y_data[0])
+    {
+      quadrant = 4;
+      x1 = -1.0;
+      if(gradient > 0)
+      {
+        y1 = gradient;
+      }
+      else
+      {
+        y1 = -gradient;
+      }
+    }
+    else
+    {
+      quadrant = 3;
+      x1 = -1.0;
+      if(gradient > 0)
+      {
+        y1 = -gradient;
+      }
+      else
+      {
+        y1 = gradient;
+      }
+    }
+  }
+  if (quadrant == -99)
+  {
+    cout << "Something has gone wrong in the vector angle code, I didn't find a quadrant" << endl;
+  }
+  //cout << "quadrant is: " << quadrant << endl;
+  //cout << "x,y are: " << x1 << " " << y1 << endl;
+  //cout << "======================" << endl << endl;
+
+  // okay, print the results
+  vector<float> vec_coords(2,0.0);
+  vec_coords[0] = x1;
+  vec_coords[1] = y1;
+  return vec_coords;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Get the data for a boxplot from an unsorted vector of floats, which does not
 // contain any NDV values.
 //
@@ -4827,7 +5911,7 @@ double deg(double radians)
 // 2Percentile 25Percentile median mean 75Percentile 98Percentile minimum maximum
 //
 // SWDG 12/11/15
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> BoxPlot(vector<float> data){
 
   vector<float> Boxplot;
@@ -6465,6 +7549,922 @@ int PointInPolygon(int VertexCount, float XCoords[], float YCoords[], float XCoo
   }
   return c;
 }
+
+
+// this function vectrize part of a map from a vector of ordered key contained by the map.
+// This sounds fuzzy but it is useful as a map is more efficient to store/find unsorted elements
+// but you want a vector when you need to get element in a certain order
+// Anyway I will use it so well, at least I understand myself.
+// BG - 08/01/2018
+vector<float> get_value_from_map_and_node(vector<int> vecnode, map<int,float>& map_int_float)
+{
+  vector<float> vecout;
+  vector<int>::iterator gorg;
+
+  for(gorg = vecnode.begin(); gorg != vecnode.end() ; gorg ++)
+  {
+    vecout.push_back(map_int_float[*gorg]);
+  }
+  return vecout;
+}
+
+
+// Absolute Deviation - Ignoring NoData
+// The Absolute Deviation is defined as follow for a population X of samples Xi:
+// ADi = |Xi - median(X)|
+// BG - 08/01/2018
+
+vector<float> get_absolute_deviation(vector<float> vecval, float NDV)
+{
+  vector<float>::iterator bubulle;
+  vector<float> vecout;
+  float med = get_median(vecval,NDV), this_val = 0;
+
+  for(bubulle = vecval.begin(); bubulle != vecval.end(); bubulle ++)
+  {
+    this_val = *bubulle;
+    vecout.push_back(abs(this_val - med));
+  }
+
+  return vecout;
+
+}
+
+
+// Median Absolute Deviation - Ignoring nodata
+// The MAD represents the Median Absolute Deviation,
+// parameter often used to detect outliers in a sample population
+// define by: MAD = median(Absolute_deviation) - see get_absolute_devitaion for details
+// BG - 08/01/2018
+float get_MAD(vector<float> vecval, float NDV)
+{
+
+  // first getting the absolute deviation
+  vector<float> vecpre = get_absolute_deviation(vecval, NDV);
+  // then getting the MAD
+  float MAD = get_median(vecpre);
+  // done
+
+  return MAD;
+
+}
+
+// The modified z-score is a parameter used to extract outliers
+// Described in Iglewicz et Hoaglin, 1993
+// define by : Mi = ( 0.645*(Xi - median(X)) ) / MAD(X)
+// BG - 08/01/2018
+vector<float> get_modified_z_score(vector<float> vecval,float NDV)
+{
+  // first get the MAD and the median
+  float MAD = get_MAD(vecval,NDV);
+  float med = get_median(vecval,NDV);
+
+  // then loop through the vector to get the modifeied x score
+  vector<float>::iterator gorg = vecval.begin();
+  vector<float> vecout;
+  float Mi = 0, this_val = 0;
+
+  for(;gorg != vecval.end();gorg ++)
+  {
+    this_val = *gorg;
+    Mi = (0.6745 * (this_val - med)) / MAD;
+    vecout.push_back(Mi);
+  }
+
+  return vecout;
+
+}
+
+
+// Detection of outlier based on the modified-z score
+// Iglewicz et hoaglin, 2013 suggests a threshold around 3.5
+// However, It can vary quite a lot. I am investigating.
+// feed it with a vector of float, it will return 0 if not and 1 if outlier
+// BG - 08/01/2018
+vector<int> is_outlier_MZS(vector<float> vecval, float NDV, float threshold)
+{
+  // first getting the modified z-score M
+  vector<float> MZC = get_modified_z_score(vecval,NDV);
+  // is outlier?
+  vector<float>::iterator malme;
+  vector<int> vecout;
+  float this_val =0;
+
+  for(malme = MZC.begin(); malme != MZC.end() ; malme++)
+  {
+    this_val = *malme;
+
+    if(this_val > threshold or this_val < -1 * threshold)
+    {
+      vecout.push_back(1);
+    }
+    else
+    {
+      vecout.push_back(0);
+    }
+  }
+
+  // DEBUG
+  // for(size_t u =0 ; u < MZC.size(); u++ )
+  // {
+  //   cout << vecval[u] << " ---> " << MZC[u] << " : " << vecout[u] << endl;
+  // }
+
+  return vecout;
+}
+
+
+
+
+
+
+
+
+// Implementation of the Kernel Density estimation method from a vector of float
+// I am using this review paper about it for the implementation:
+// Sheather 2004 - DOI 10.1214/088342304000000297
+// I may try to find a recent one but this last is quite well cited and post 2000 and clear ( I don't want to be a SHEATER ahah, I am not sure if this can be consider as a joke but I am laugthing)
+//
+// This is the fully automated version, an attempt to provide a non parametric KDE estimation
+//
+// Work in progress, like a lot
+// BG - 04/01/2018  - Bonne annee
+
+pair<float,vector<float> > auto_KDE(vector<float> vpoint)
+{
+
+
+  if(vpoint.size() == 0)
+  {
+    cout<< endl << "FATAL ERROR LSDStatstools::autoKDE empty vector" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // first deal with the bandwith  - probably using the sheather-Jones plugin method
+  // TODO :: This method
+  // However, let's try a more efficient method first
+  // Terrel (1990) - a rule of the thumb first estimation
+  float mean = get_mean(vpoint);
+  float S =  get_standard_deviation(vpoint,mean);
+  int n = vpoint.size();
+  float h = 1.144 * S * pow(n, -0.2); // Terrel(1990) detailed and extracted Sheater (2004) section 3.1
+
+  // then calling the KDE function
+  vector<float> vout = gaussian_KDE(vpoint,h);
+
+  pair<float,vector<float> > gat = make_pair(h,vout);
+
+  return gat;
+
+}
+
+
+// KDE calculation for a vector of float using a gaussian kernel with a bandwith h
+//
+// BG - 04/01/2018
+vector<float> gaussian_KDE(vector<float> vpoint, float h)
+{
+  vector<float> vout;
+  // get N
+  int n = vpoint.size();
+
+  // Calculate the sum
+  // ### This precision for PI should be acceptable
+  float sum = 0, X = 0, Xi = 0, PI = 3.14159;
+  vector<float>::iterator antidisestablishmentarianism, tuvalu; // Antidisestablishmentarianism is the longest word in English that is non-coined and non-technical. Also, this is a terible name for a variable.
+  for(antidisestablishmentarianism = vpoint.begin(); antidisestablishmentarianism != vpoint.end(); antidisestablishmentarianism++)
+  {
+    // Setting the sample for this run of the loop
+    X = *antidisestablishmentarianism; // this sample
+    sum = 0; // reinitializing the sum for each sample
+    // summing the elements
+    for(tuvalu = vpoint.begin(); tuvalu != vpoint.end(); tuvalu++)
+    {
+      // setting the testing for this run for this sum
+      Xi = *tuvalu;
+      float y = 0;
+      y = (X-Xi/h);
+      // incrementing the sum: using a gaussian kernel for each X - Xi
+      sum += 1/(sqrt(2*PI)) * exp(-pow(y,2)/2);
+    }
+
+    // saving the KDE
+    vout.push_back((1/(n*h)) * sum);
+  }
+  // Done, not that complicated after all
+  return vout;
+
+}
+
+
+// Detection of outlier based on the First Minimum on the KDE pdf
+// Testing it right now
+// feed it with a vector of float, it will a vector of int with 0 if not and 1 if outlier
+// BG - 08/01/2018
+// vector<int> is_outlier_FMKDE(vector<float>& veKDE, vector<float>& vedkdc, float ndv)
+// {
+//   // preparing an integer iterator
+//   size_t gorg = 0;
+
+
+
+
+// }
+
+
+// This function takes one vector of float that you wanna sort and sort in the same order all the other vector of float you give to him
+// can be useful and efficient for multivariate vector stuffs
+// BG - 09/01/2018
+vector<vector<float> > sort_vectors_from_one(vector<float> to_sort, vector<vector<float> > follow_the_sort)
+{
+  // first step is to create a vector of pair<value,idx>
+  vector<pair<float,int> > voult;
+  pair<float,int> this_pair;
+
+
+  for(size_t bagel = 0 ; bagel < to_sort.size() ; bagel++)
+  {
+    this_pair = make_pair(to_sort[bagel] , bagel);
+    voult.push_back(this_pair);
+  }
+
+  // Second step: sorting the vector
+  sort(voult.begin(), voult.end());
+  vector<pair<float,int> > sorted = voult;
+
+  // Third step: extracting the vector of int
+  vector<int> new_idx;
+  vector<float> new_val;
+  for(vector<pair<float,int> >::iterator kik = sorted.begin(); kik!= sorted.end() ; kik++)
+  {
+    this_pair = *kik;
+    new_idx.push_back(this_pair.second);
+
+  }
+
+  // Fourth step: sorting the other vector in the same way
+  vector<vector<float> >::iterator gorg;
+  vector<vector<float> > vout;
+  vector<float> this_vec;
+  vout.push_back(new_val);
+  for(gorg = follow_the_sort.begin(); gorg!= follow_the_sort.end(); gorg++)
+  {
+    this_vec = *gorg;
+    vout.push_back(reorganize_vector_from_new_idx(this_vec,new_idx));
+  }
+
+  // return a vector of vector allsorted on the model of the first vector in the vector of vector
+  // It is a kind of vectorsception
+
+  return vout;
+
+
+}
+
+
+// Reorganize a vector from a vector of ordered old idx
+vector<float> reorganize_vector_from_new_idx(vector<float> vecval, vector<int> vecid)
+{
+  vector<int>::iterator poisson_rouge;
+  vector<float> vecout;
+
+  for(poisson_rouge = vecid.begin(); poisson_rouge != vecid.end() ; poisson_rouge++)
+  {
+    int thisid = *poisson_rouge;
+    vecout.push_back(vecval[thisid]);
+
+  }
+
+  return vecout;
+}
+
+// #########################################################################################
+// ############# The following functions are adapted from Raykar et al., 2006 ##############
+// ############# DOI: CS-TR-4774/UMIACS-TR-2005-73 #########################################
+// ############# Code available here: ######################################################
+// # http://www.umiacs.umd.edu/labs/cvl/pirl/vikas/Software/optimal_bw/optimal_bw_code.htm #
+// #########################################################################################
+// #########################################################################################
+//-------------------------------------------------------------------
+// The original code was written by Vikas C. Raykar
+// and is copyrighted under the Lesser GPL:
+//
+// Copyright (C) 2006 Vikas C. Raykar
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as
+// published by the Free Software Foundation; version 2.1 or later.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU Lesser General Public License for more details.
+// You should have received a copy of the GNU Lesser General Public
+// License along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston,
+// MA 02111-1307, USA.
+//
+// The author may be contacted via email at: vikas(at)cs(.)umd(.)edu
+//-------------------------------------------------------------------
+
+//-------------------------------------------------------------
+// File    : UnivariateDensityDerivative.cpp
+// Purpose : Implementation for for UnivariateDensityDerivative
+// Author  : Vikas C. Raykar (vikas@cs.umd.edu)
+// Date    : September 17, 2005
+//-------------------------------------------------------------
+
+//-------------------------------------------------------------
+// Implemented inside LSDTT by Boris Gailleton
+// Date: Januray 2018
+//-------------------------------------------------------------
+
+
+//-------------------------------------------------------------------
+// Constructor.
+//
+// PURPOSE
+// -------
+// Initialize the class.
+// Read the parameters.
+// Choose the parameter for the algorithm.
+// Space subdivision.
+// Compute the constant a.
+// Compute B or all the clusters.
+//
+// PARAMETERS
+// ----------
+// NSources         --> number of sources, N.
+// MTargets         --> number of targets, M.
+// pSources         --> pointer to sources, px(N).
+// pTargets           --> pointer to the targets, py(M).
+// Bandwidth      --> the source bandwidth, h.
+// Order              --> order of the derivative, r.
+// epsilon            --> desired error, eps.
+// pDensityDerivative --> pointer the the evaluated Density
+//-------------------------------------------------------------------
+
+
+UnivariateDensityDerivative::UnivariateDensityDerivative(int NSources,
+      int MTargets,
+      double *pSources,
+      double *pTargets,
+      double Bandwidth,
+        int Order,
+      double epsilon,
+      double *pDensityDerivative)
+{
+  // Read the arguments.
+
+  N=NSources;
+  M=MTargets;
+  px=pSources;
+  h=Bandwidth;
+  r=Order;
+  py=pTargets;
+  pD=pDensityDerivative;
+  eps=epsilon;
+
+
+  h_square=h*h;
+  two_h_square=2*h_square;
+
+  pi=3.14159265358979;
+  q=(pow(-1,r))/(sqrt(2*pi)*N*(pow(h,(r+1))));
+  //printf("q=%f \n",q);
+
+
+  // Choose the parameters for the algorithm.
+
+  choose_parameters();
+
+  // Space sub-division
+
+  space_sub_division();
+
+  // Compute the constant a
+
+  compute_a();
+
+  // Compute the constant B
+
+  compute_B();
+
+
+}
+
+//-------------------------------------------------------------------
+// Destructor.
+//-------------------------------------------------------------------
+
+UnivariateDensityDerivative::~UnivariateDensityDerivative()
+{
+  delete []a_terms;
+  delete []B_terms;
+}
+
+
+
+
+//-------------------------------------------------------------------
+// Compute the factorial.
+//-------------------------------------------------------------------
+
+int
+UnivariateDensityDerivative::factorial(int n){
+
+  int fact=1;
+
+  for ( int i = 1; i <= n; i++){
+    fact=fact*i;
+  }
+
+  return fact;
+}
+
+//-------------------------------------------------------------------
+// Choose the parameters
+// 1. rx --> interval length.
+// 2. K  --> number of intervals.
+// 3. rr --> cutoff radius.
+// 4. ry --> cluster cutoff radius.
+// 5. p  --> truncation number.
+//-------------------------------------------------------------------
+
+void
+UnivariateDensityDerivative::choose_parameters(){
+
+  // 1. rx --> interval length.
+
+  rx=h/2;
+
+  // 2. K  --> number of intervals.
+
+  K=(int)ceil(1.0/rx);
+  rx=1.0/K;
+  double rx_square=rx*rx;
+
+  // 3. rr --> cutoff radius.
+
+    //double r_term=pow(2.0,r/2)*sqrt((double)factorial(r));
+  double r_term=sqrt((double)factorial(r));
+
+  rr=min_KDE(R,2*h*sqrt(log(r_term/eps)));
+
+  // 4. ry --> cluster cutoff radius.
+  ry=rx+rr;
+
+  // 5. p  --> truncation number.
+
+  p=0;
+  double error=1;
+  double temp=1;
+  double comp_eps=eps/r_term;
+
+  while((error > comp_eps) & (p <= P_UL)){
+    p++;
+    double b=min_KDE(((rx+sqrt((rx_square)+(8*p*h_square)))/2),ry);
+    double c=rx-b;
+    temp=temp*(((rx*b)/h_square)/p);
+    error=temp*(exp(-(c*c)/2*two_h_square));
+  }
+  p=p+1;
+
+
+
+  //printf("h=%f r=%d eps=%f K=%d rx=%f rr=%f ry=%f p=%d\n",h,r,eps,K,rx,rr,ry,p);
+
+}
+
+
+//-------------------------------------------------------------------
+// Space subdivision
+//-------------------------------------------------------------------
+
+void
+UnivariateDensityDerivative::space_sub_division(){
+
+  // 1. Cluster Centers
+
+  pClusterCenter=new double[K];
+  for(int i=0; i<K; i++){
+    pClusterCenter[i]=(i*rx)+(rx/2);
+    //printf("%f\n",pClusterCenter[i]);
+  }
+
+  //2. Allocate each source to the corresponding interval
+
+    pClusterIndex=new int[N];
+  for(int i=0; i<N; i++){
+    pClusterIndex[i]=min_KDE((int)floor(px[i]/rx),K-1);
+    //printf("x=%f Cluster=%d\n",px[i],pClusterIndex[i]);
+  }
+
+}
+
+//-------------------------------------------------------------------
+// Compute the contant term a_{lm}.
+// l=0...floor(r/2)
+// m=0...r-2l
+//-------------------------------------------------------------------
+
+void
+UnivariateDensityDerivative::compute_a(){
+
+  double r_factorial=(double)factorial(r);
+  //printf("%f \n",r_factorial);
+
+    double *l_constant;
+  l_constant=new double[((int)floor((double)r/2))+1];
+  l_constant[0]=1;
+  for(int l=1; l <= (int)floor((double)r/2); l++){
+    l_constant[l]=l_constant[l-1]*(-1.0/(2*l));
+    //printf("%f \n",l_constant[l]);
+  }
+
+  double *m_constant;
+  m_constant=new double[r+1];
+  m_constant[0]=1;
+  for(int m=1; m <= r; m++){
+    m_constant[m]=m_constant[m-1]*(-1.0/m);
+    //printf("%f \n",m_constant[m]);
+  }
+
+  num_of_a_terms=0;
+  for(int l=0; l <= (int)floor((double)r/2); l++){
+    for(int m=0; m <= r-(2*l); m++){
+      num_of_a_terms++;
+    }
+  }
+
+  //printf("r=%d num_of_a_terms=%d\n",r,num_of_a_terms);
+
+  a_terms=new double[num_of_a_terms];
+  int k=0;
+  for(int l=0; l <= (int)floor((double)r/2); l++){
+    for(int m=0; m <= r-(2*l); m++){
+      a_terms[k]=(l_constant[l]*m_constant[m]*r_factorial)/((double)factorial(r-(2*l)-m));
+      //printf("%f \n",a_terms[k]);
+      k++;
+    }
+  }
+  delete []l_constant;
+  delete []m_constant;
+
+}
+
+//-------------------------------------------------------------------
+// Compute the contant term B^{n}_{km} for all the clusters.
+// n=0...K-1
+// k=0...p-1
+// m=0...r
+//-------------------------------------------------------------------
+
+void
+UnivariateDensityDerivative::compute_B(){
+
+  num_of_B_terms=K*p*(r+1);
+
+  //printf("K=%d p=%d r=%d num_of_B_terms=%d\n",K,p,r,num_of_B_terms);
+
+  B_terms=new double[num_of_B_terms];
+
+  double *k_factorial;
+  k_factorial=new double[p];
+
+  k_factorial[0]=1;
+  for(int i=1; i<p ;i++){
+    k_factorial[i]=k_factorial[i-1]/i;
+    //printf("%f \n",k_factorial[i]);
+  }
+
+  double *temp3;
+  temp3=new double[p+r];
+
+  for(int n=0; n<K; n++){
+    //printf("Cluster %d ",n);
+    for(int k=0; k<p; k++){
+      for(int m=0; m< r+1; m++){
+        B_terms[(n*p*(r+1))+((r+1)*k)+m]=0.0;;
+        //printf("%f ",B_terms[(n*p*(r+1))+((r+1)*k)+m]);
+      }
+    }
+    //printf("\n");
+  }
+
+  for(int i=0; i<N; i++){
+    int cluster_number=pClusterIndex[i];
+    double temp1=(px[i]-pClusterCenter[cluster_number])/h;
+    double temp2=exp(-temp1*temp1/2);
+    temp3[0]=1;
+    for(int k=1; k<p+r; k++){
+      temp3[k]=temp3[k-1]*temp1;
+    }
+
+    for(int k=0; k<p; k++){
+      for(int m=0; m< r+1; m++){
+        B_terms[(cluster_number*p*(r+1))+((r+1)*k)+m]+=(temp2*temp3[k+m]);
+      }
+    }
+  }
+
+  for(int n=0; n<K; n++){
+    //printf("Cluster %d ",n);
+    for(int k=0; k<p; k++){
+      for(int m=0; m< r+1; m++){
+        B_terms[(n*p*(r+1))+((r+1)*k)+m]*=(k_factorial[k]*q);
+        //printf("%f ",B_terms[(n*p*(r+1))+((r+1)*k)+m]);
+      }
+    }
+    //printf("\n");
+  }
+
+
+  delete []k_factorial;
+  delete []temp3;
+
+
+}
+
+
+//-------------------------------------------------------------------
+// Actual function to evaluate the Univariate Density Derivative.
+//-------------------------------------------------------------------
+
+void
+UnivariateDensityDerivative::Evaluate()
+{
+
+  //int num_of_influential_neighbors=(int)ceil(ry/rx);
+  //printf("Num of influential right or left neighbors = %d\n",num_of_influential_neighbors);
+
+  double *temp3;
+  temp3=new double[p+r];
+
+
+  for(int j=0; j<M; j++){
+    pD[j]=0.0;
+
+    int target_cluster_number=min_KDE((int)floor(py[j]/rx),K-1);
+    double temp1=py[j]-pClusterCenter[target_cluster_number];
+    double dist=abs(temp1);
+    while (dist <= ry && target_cluster_number <K && target_cluster_number >=0){
+
+      //printf("j=%d y=%f Influential cluster=%d\n",j,py[j],target_cluster_number);
+      //Do something
+      double temp2=exp(-temp1*temp1/two_h_square);
+      double temp1h=temp1/h;
+      temp3[0]=1;
+      for(int i=1; i<p+r; i++){
+        temp3[i]=temp3[i-1]*temp1h;
+      }
+
+      for(int k=0; k<=p-1; k++){
+        int dummy=0;
+        for(int l=0; l <= (int)floor((double)r/2); l++){
+          for(int m=0; m <= r-(2*l); m++){
+            pD[j]=pD[j]+(a_terms[dummy]*B_terms[(target_cluster_number*p*(r+1))+((r+1)*k)+m]*temp2*temp3[k+r-(2*l)-m]);
+            dummy++;
+          }
+        }
+      }
+      //
+
+
+      target_cluster_number++;
+      temp1=py[j]-pClusterCenter[target_cluster_number];
+      dist=abs(temp1);
+    }
+
+    target_cluster_number=min_KDE((int)floor(py[j]/rx),K-1)-1;
+    if (target_cluster_number >=0){
+      double temp1=py[j]-pClusterCenter[target_cluster_number];
+      double dist=abs(temp1);
+      while (dist <= ry && target_cluster_number <K && target_cluster_number >=0){
+        //printf("j=%d y=%f Influential cluster=%d\n",j,py[j],target_cluster_number);
+        //Do something
+        double temp2=exp(-temp1*temp1/two_h_square);
+          double temp1h=temp1/h;
+        temp3[0]=1;
+        for(int i=1; i<p+r; i++){
+          temp3[i]=temp3[i-1]*temp1h;
+        }
+
+        for(int k=0; k<=p-1; k++){
+          int dummy=0;
+          for(int l=0; l <= (int)floor((double)r/2); l++){
+            for(int m=0; m <= r-(2*l); m++){
+              pD[j]=pD[j]+(a_terms[dummy]*B_terms[(target_cluster_number*p*(r+1))+((r+1)*k)+m]*temp2*temp3[k+r-(2*l)-m]);
+              dummy++;
+            }
+          }
+        }
+        //
+        target_cluster_number--;
+        temp1=py[j]-pClusterCenter[target_cluster_number];
+        dist=abs(temp1);
+      }
+    }
+
+  }
+
+
+  delete []temp3;
+}
+
+
+
+/*
+Total variation denoising of 1-D signals, a.k.a. Fused lasso
+signal approximator, by Laurent Condat.
+
+Version 2.0, Aug. 30, 2017.
+
+Given a real vector y of length N and a real lambda>=0, the
+goal is to compute the real vector x minimizing
+    ||x-y||_2^2/2 + lambda.TV(x),
+where ||x-y||_2^2 = sum_{n=1}^{N} (x[n]-y[n])^2 and
+TV(x) = sum_{n=1}^{N-1} |x[n+1]-x[n]|.
+
+I proposed a fast and exact algorithm (say, the version 1.0)
+for this problem in L. Condat, "A direct algorithm for 1D
+total variation denoising," IEEE Signal Proc. Letters, vol.
+20, no. 11, pp. 1054-1057, Nov. 2013.
+It has worst case complexity O(N^2) but it is recognized as
+the fastest in practice (using the C code on my webpage).
+
+The present code is a C implementation of a NEW algorithm,
+which combines the advantages of the v1 algorithm with the
+optimal O(N) complexity of the taut string algorithm.
+That is, it is exact, numerically robust (averages of values
+computed by Welford-Knuth running mean algorithm, not by sum
+divided by length), roughly as fast as the v1 algorithm, and
+it has linear time complexity.
+Speed: the computation time of this C code is typically
+85%-120% of the computation time of the C code of the v1.
+
+In a nutshell, the algorithm is based on the classical Pool
+Adjacent Violators Algorithm for isotonic regression, to
+maintain two nonincreasing and nondecreasing (instead of
+constant in the v1) lower and upper approximations of the
+signal.
+
+If lambda=0, the algorithm returns x=y, but not exactly, only
+up to machine precision.
+
+Usage rights : Copyright Laurent Condat.
+This file is distributed under the terms of the CeCILL
+licence (compatible with the GNU GPL), which can be
+found at the URL "http://www.cecill.info".
+*/
+/* double is recommended; in that case the precision is of order 1e-11. With float, the precision for a typical signal with values in [0,255] is of order 5e-3 only. */
+
+
+/*
+In the notations above, input is y, output is x, width is N.
+We must have width>=1 and lambda>=0.
+The initial content of the output buffer does not matter.
+The buffers input and output must be allocated of size at least width.
+The algorithm can operate in place, with output=input; in that case the input is replaced by the output.
+
+See the Matlab code on my webpage for comments.
+*/
+vector<double> TV1D_denoise_v2(vector<double> input,  double lambda) {
+
+
+  if(lambda == 0)
+  {
+    cout << "Lambda = 0, TVD will only be a minimization by the sum of squares" << endl ;
+  }
+
+
+  unsigned int width = input.size();
+  vector<double> output(width);
+  vector<double> indstart_low(width);
+  vector<double> indstart_up(width);
+  unsigned int j_low = 0, j_up = 0, jseg = 0, indjseg = 0, i=1, indjseg2, ind;
+  double output_low_first = input[0]-lambda;
+  double output_low_curr = output_low_first;
+  double output_up_first = input[0]+lambda;
+  double output_up_curr = output_up_first;
+  double twolambda=2.0*lambda;
+  if (width==1) {output = input;}
+  else
+  {
+
+    indstart_low[0] = 0;
+    indstart_up[0] = 0;
+    width--;
+    for (; i<width; i++) {
+        if (input[i]>=output_low_curr) {
+          if (input[i]<=output_up_curr) {
+              output_up_curr+=(input[i]-output_up_curr)/(i-indstart_up[j_up]+1);
+              output[indjseg]=output_up_first;
+              while ((j_up>jseg)&&(output_up_curr<=output[ind=indstart_up[j_up-1]]))
+                output_up_curr+=(output[ind]-output_up_curr)*
+                  ((double)(indstart_up[j_up--]-ind)/(i-ind+1));
+              if (j_up==jseg) {
+                while ((output_up_curr<=output_low_first)&&(jseg<j_low)) {
+                  indjseg2=indstart_low[++jseg];
+                output_up_curr+=(output_up_curr-output_low_first)*
+                  ((double)(indjseg2-indjseg)/(i-indjseg2+1));
+                while (indjseg<indjseg2) output[indjseg++]=output_low_first;
+                output_low_first=output[indjseg];
+                }
+              output_up_first=output_up_curr;
+              indstart_up[j_up=jseg]=indjseg;
+              } else output[indstart_up[j_up]]=output_up_curr;
+          } else
+              output_up_curr=output[i]=input[indstart_up[++j_up]=i];
+            output_low_curr+=(input[i]-output_low_curr)/(i-indstart_low[j_low]+1);
+            output[indjseg]=output_low_first;
+            while ((j_low>jseg)&&(output_low_curr>=output[ind=indstart_low[j_low-1]]))
+              output_low_curr+=(output[ind]-output_low_curr)*
+                  ((double)(indstart_low[j_low--]-ind)/(i-ind+1));
+            if (j_low==jseg) {
+              while ((output_low_curr>=output_up_first)&&(jseg<j_up)) {
+              indjseg2=indstart_up[++jseg];
+              output_low_curr+=(output_low_curr-output_up_first)*
+                ((double)(indjseg2-indjseg)/(i-indjseg2+1));
+              while (indjseg<indjseg2) output[indjseg++]=output_up_first;
+              output_up_first=output[indjseg];
+              }
+              if ((indstart_low[j_low=jseg]=indjseg)==i) output_low_first=output_up_first-twolambda;
+              else output_low_first=output_low_curr;
+            } else output[indstart_low[j_low]]=output_low_curr;
+        } else {
+            output_up_curr+=((output_low_curr=output[i]=input[indstart_low[++j_low] = i])-
+              output_up_curr)/(i-indstart_up[j_up]+1);
+            output[indjseg]=output_up_first;
+            while ((j_up>jseg)&&(output_up_curr<=output[ind=indstart_up[j_up-1]]))
+              output_up_curr+=(output[ind]-output_up_curr)*
+                  ((double)(indstart_up[j_up--]-ind)/(i-ind+1));
+            if (j_up==jseg) {
+              while ((output_up_curr<=output_low_first)&&(jseg<j_low)) {
+              indjseg2=indstart_low[++jseg];
+              output_up_curr+=(output_up_curr-output_low_first)*
+                ((double)(indjseg2-indjseg)/(i-indjseg2+1));
+              while (indjseg<indjseg2) output[indjseg++]=output_low_first;
+              output_low_first=output[indjseg];
+              }
+            if ((indstart_up[j_up=jseg]=indjseg)==i) output_up_first=output_low_first+twolambda;
+            else output_up_first=output_up_curr;
+            } else output[indstart_up[j_up]]=output_up_curr;
+        }
+    }
+    /* here i==width (with value the actual width minus one) */
+    if (input[i]+lambda<=output_low_curr) {
+          while (jseg<j_low) {
+          indjseg2=indstart_low[++jseg];
+          while (indjseg<indjseg2) output[indjseg++]=output_low_first;
+          output_low_first=output[indjseg];
+      }
+      while (indjseg<i) output[indjseg++]=output_low_first;
+        output[indjseg]=input[i]+lambda;
+    } else if (input[i]-lambda>=output_up_curr) {
+      while (jseg<j_up) {
+          indjseg2=indstart_up[++jseg];
+          while (indjseg<indjseg2) output[indjseg++]=output_up_first;
+          output_up_first=output[indjseg];
+      }
+      while (indjseg<i) output[indjseg++]=output_up_first;
+        output[indjseg]=input[i]-lambda;
+    } else {
+          output_low_curr+=(input[i]+lambda-output_low_curr)/(i-indstart_low[j_low]+1);
+          output[indjseg]=output_low_first;
+          while ((j_low>jseg)&&(output_low_curr>=output[ind=indstart_low[j_low-1]]))
+            output_low_curr+=(output[ind]-output_low_curr)*
+                  ((double)(indstart_low[j_low--]-ind)/(i-ind+1));
+          if (j_low==jseg) {
+            if (output_up_first>=output_low_curr)
+              while (indjseg<=i) output[indjseg++]=output_low_curr;
+            else {
+              output_up_curr+=(input[i]-lambda-output_up_curr)/(i-indstart_up[j_up]+1);
+              output[indjseg]=output_up_first;
+              while ((j_up>jseg)&&(output_up_curr<=output[ind=indstart_up[j_up-1]]))
+                output_up_curr+=(output[ind]-output_up_curr)*
+                  ((double)(indstart_up[j_up--]-ind)/(i-ind+1));
+              while (jseg<j_up) {
+              indjseg2=indstart_up[++jseg];
+              while (indjseg<indjseg2) output[indjseg++]=output_up_first;
+              output_up_first=output[indjseg];
+              }
+              indjseg=indstart_up[j_up];
+              while (indjseg<=i) output[indjseg++]=output_up_curr;
+            }
+          } else {
+            while (jseg<j_low) {
+            indjseg2=indstart_low[++jseg];
+            while (indjseg<indjseg2) output[indjseg++]=output_low_first;
+            output_low_first=output[indjseg];
+            }
+            indjseg=indstart_low[j_low];
+            while (indjseg<=i) output[indjseg++]=output_low_curr;
+          }
+    }
+  }
+  return output;
+}
+
 
 
 #endif

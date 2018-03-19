@@ -86,6 +86,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <map>
 #include <algorithm>
 #include "TNT/tnt.h"
 #include "LSDFlowInfo.hpp"
@@ -988,8 +989,12 @@ vector<int> LSDJunctionNetwork::get_all_source_nodes_of_an_outlet_junction(int j
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// This function returns a vector of node indices to all the donor
-// nodes of a particular node
+// This function returns a vector of junction indices to all the donor
+// junctions of a particular junction
+//
+// IMPORTANT: this has only retained the string "node" to keep equivalence
+//  with the FlowInfo object. It takes junctions and returns junctions!!
+// Also note that base level nodes have themselves as a donor
 //
 // SMM 16/6/2015
 //
@@ -1040,18 +1045,18 @@ int LSDJunctionNetwork::map_junction_to_upslope_junction_list(vector<int> upslop
 
 	return mapped_us_junction_index;
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function returns the maximum stream order
 //
 // SMM 01/09/2012
 //
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 int LSDJunctionNetwork::get_maximum_stream_order()
 {
   int max_stream_order = 0;
@@ -1064,15 +1069,15 @@ int LSDJunctionNetwork::get_maximum_stream_order()
   }
   return max_stream_order;
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function returns the number of streams of a given stream order
 //
 // FJC 15/03/16
 //
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 int LSDJunctionNetwork::get_number_of_streams(LSDFlowInfo& FlowInfo, int stream_order)
 {
   int count = 0;
@@ -1093,16 +1098,402 @@ int LSDJunctionNetwork::get_number_of_streams(LSDFlowInfo& FlowInfo, int stream_
   }
   return count;
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the junction angles
+// returns a map of float vectors. The float vector actually contains a float
+// and 3 ints converted to float: the angle and the stream order of the junction
+// and its 2 donors.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+map<int, vector<float> > LSDJunctionNetwork::calculate_junction_angles(vector<int> JunctionList, LSDFlowInfo& FlowInfo)
+{
+  map<int, vector<float> > map_of_junction_angles;
+  vector<float> temp_junctioninfo;
+  vector<float> four_element(4,0);
+
+  int NJuncs = int(JunctionList.size());
+  if (NJuncs == 0)
+  {
+    NJuncs = get_NJunctions();
+    cout << "You gave me an empty junction list, I am getting angles for all junctions." << endl;
+    vector<int> JL;
+    for(int i = 0; i<NJunctions; i++)
+    {
+      JL.push_back(i);
+    }
+    JunctionList = JL;
+  }
+
+  // now go through each junction getting the angles
+  //vector<float> JunctionAngles;
+  vector<int> donors;
+  float this_angle;
+  bool is_baselevel;
+  bool channel_points_downstream = true;  // this is needed to get the correct
+                                          // orientation of the channels
+  int end_node, start_node1, start_node2;
+  int junction_order, donor1_order, donor2_order;
+
+  // vectors for holding the channel locations
+  vector<float> x1, x2, y1, y2;
+  int this_junc;
+
+  // loop through junctions
+  for(int junc = 0; junc < NJuncs; junc++ )
+  {
+
+    this_junc = JunctionList[junc];
+    //cout << endl << "==================" << endl << "Junction is: " << this_junc << endl;
+
+    // check to see if the junction exists
+    if (this_junc >= NJunctions)
+    {
+      cout << "FATAL ERROR LSDJunctionNetwork::calculate_junction_angles" << endl;
+      cout << "You have called a junction that doesn't exist." << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    // check if it is a baselevel node
+    int ReceiverJN = get_Receiver_of_Junction(this_junc);
+    is_baselevel = (this_junc == ReceiverJN) ? true : false;
+
+    // if not a baselevel see if it has donors
+    if (is_baselevel)
+    {
+      //cout << "This is a baselevel junction." << endl;
+      //JunctionAngles.push_back(NoDataValue);
+    }
+    else
+    {
+      // check the junction to see if it has two or more donors
+      donors = get_donor_nodes(this_junc);
+
+      // it has donors
+      if( int(donors.size()) >= 2)
+      {
+        if ( int(donors.size()) > 2)
+        {
+          cout << "Warning, this junction is a weirdo and has more than two donors. I am going to use the first two donors." << endl;
+        }
+
+
+        // reset the temp vector
+        temp_junctioninfo = four_element;
+
+        //cout << "The donor junctions are: " << donors[0] << ", " << donors[1] << endl;
+        // now get the two segments.
+        // The ending node is the current junction, the starting nodes are the
+        // two donor junctions.
+        end_node = get_Node_of_Junction(this_junc);
+        start_node1 = get_Node_of_Junction(donors[0]);
+        start_node2 = get_Node_of_Junction(donors[1]);
+
+        // extract the channel information
+        LSDIndexChannel c1(start_node1, end_node,FlowInfo);
+        LSDIndexChannel c2(start_node2, end_node,FlowInfo);
+
+        // now get the locations of the nodes in the channels in x,y coordinates
+        c1.get_coordinates_of_channel_nodes(x1, y1);
+        c2.get_coordinates_of_channel_nodes(x2, y2);
+
+        junction_order = get_StreamOrder_of_Junction(FlowInfo,this_junc);
+        donor1_order = get_StreamOrder_of_Junction(FlowInfo,donors[0]);
+        donor2_order = get_StreamOrder_of_Junction(FlowInfo,donors[1]);
+
+        temp_junctioninfo[1] = float(junction_order);
+        temp_junctioninfo[2] = float(donor1_order);
+        temp_junctioninfo[3] = float(donor2_order);
+
+        // now calculate the angle
+        this_angle = angle_between_two_vector_datasets(x1, y1,x2, y2,channel_points_downstream);
+        this_angle = fabs(this_angle);
+        //JunctionAngles.push_back(this_angle);
+        //cout << "Angle is: " << this_angle << " radians, which is " << deg(this_angle) << " degrees." << endl;
+        //cout << "Stream order is " << junction_order << " with donor 1: " << donor1_order << " and donor2: " << donor2_order << endl;
+        temp_junctioninfo[0] = this_angle;
+
+        map_of_junction_angles[this_junc] = temp_junctioninfo;
+      }
+      else
+      {
+        //cout << "This junction doesn't have 2 donors; it must be a source." << endl;
+        //JunctionAngles.push_back(NoDataValue);
+      }
+    }
+  }
+
+
+  return map_of_junction_angles;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function gets the mean and standard error of every junction angle
+// upslope of a given junction
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDJunctionNetwork::calculate_junction_angle_statistics_upstream_of_junction(int target_junction, LSDFlowInfo& FlowInfo)
+{
+  // get all the upslope junctions
+  vector<int> JunctionList = get_upslope_junctions(target_junction);
+  cout << "There are " << JunctionList.size() << " upslope junctions that I'll analyse" << endl;
+  vector<float> JI_stats;
+
+  // now get all the
+  map<int, vector<float> >::iterator iter;
+  map<int, vector<float> > JuncInfo = calculate_junction_angles(JunctionList,FlowInfo);
+
+  // now get statistics from these
+  vector<float> junc_angles;
+  vector<float> this_JI;
+
+  for(iter = JuncInfo.begin(); iter != JuncInfo.end(); ++iter)
+  {
+    this_JI = iter->second;
+    if (isnan(this_JI[0]) == false)
+    {
+      junc_angles.push_back(this_JI[0]);
+    }
+  }
+  cout << "N Junction angles: " << junc_angles.size() << endl;
+
+  // now get the stats
+  float mean = get_mean_ignore_ndv(junc_angles,NoDataValue);
+  float stddev = get_standard_deviation(junc_angles,mean,NoDataValue);
+  float stderr =  get_standard_error(junc_angles,stddev);
+  // sort the data so we can get the median and percentiles
+  vector<size_t> index_map;
+  vector<float> junc_angles_sorted;
+  matlab_float_sort(junc_angles, junc_angles_sorted, index_map);
+  float median = get_median_sorted(junc_angles_sorted);
+  float p25 = get_percentile(junc_angles_sorted, 25);
+  float p75 = get_percentile(junc_angles_sorted, 75);
+  float mad = get_median_absolute_deviation(junc_angles_sorted,median);
+
+  JI_stats.push_back(mean);
+  JI_stats.push_back(stderr);
+  JI_stats.push_back(float(junc_angles.size()));
+  JI_stats.push_back(median);
+  JI_stats.push_back(p25);
+  JI_stats.push_back(p75);
+  JI_stats.push_back(mad);
+
+  return JI_stats;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function prints a csv of statistics of the junction angles from a series
+// of basins.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::print_junction_angles_from_basin_list(vector<int> JunctionList, LSDFlowInfo& FlowInfo, string csv_outname)
+{
+
+  ofstream csv_out;
+  csv_out.open(csv_outname.c_str());
+  csv_out.precision(9);
+
+  csv_out << "BasinJunction,StreamOrder,Median,25th_percentile,75th_percentile,MAD" << endl;
+
+  // loop through each basin and get the stats
+  for (int i = 0; i < int(JunctionList.size()); i++)
+  {
+    int outlet_jn = JunctionList[i];
+    // get all the upslope junctions
+    vector<int> upslope_junctions = get_upslope_junctions(outlet_jn);
+    cout << "There are " << upslope_junctions.size() << " upslope junctions that I'll analyse" << endl;
+    vector<float> JI_stats;
+
+    // now get all the angles
+    map<int, vector<float> >::iterator iter;
+    map<int, vector<float> > JuncInfo = calculate_junction_angles(upslope_junctions,FlowInfo);
+
+    // now get statistics from these
+    vector<float> junc_angles;
+    vector<int> stream_order;
+    vector<float> this_JI;
+
+    for(iter = JuncInfo.begin(); iter != JuncInfo.end(); ++iter)
+    {
+      this_JI = iter->second;
+      if (isnan(this_JI[0]) == false)
+      {
+        junc_angles.push_back(this_JI[0]);
+        stream_order.push_back(int(this_JI[1]));
+      }
+    }
+    cout << "N Junction angles: " << junc_angles.size() << endl;
+
+    // now sort the vector by stream order. We want to get individual stats
+    // for each order
+    vector<size_t> index_map;
+    vector<int> stream_order_sorted;
+    vector<float> junc_angles_sorted;
+    matlab_int_sort(stream_order, stream_order_sorted, index_map);
+    matlab_float_reorder(junc_angles, index_map, junc_angles_sorted);
+
+    // get the max stream order for this basin = the SO of the junction you're at
+    int max_order = get_StreamOrder_of_Junction(outlet_jn);
+
+    // declare a map to store the results.  This has the format:
+    // vector<float> medians, vector<float> 25th_percentiles, vector<float> 75th_percentiles, vector<float> median_absolute_deviation
+    // then you can get the stream orders by indexing the individual vectors.  E.g. the median
+    // of the 3rd stream order would be junction_angle_stats[0][2]
+    //map<vector<float>, vector<float>, vector<float>, vector<float>> junction_angle_stats;
+
+    for (int SO = 2; SO < max_order; SO++)
+    {
+      cout << "This stream order is: " << SO << endl;
+      vector<float> these_angles;
+      // find the angles of this stream order
+      for (int j = 0; j < int(stream_order_sorted.size()); j++)
+      {
+        cout << "This SO is: " << stream_order_sorted[j] << endl;
+        if (stream_order_sorted[j] == (SO))
+        {
+          these_angles.push_back(junc_angles_sorted[j]);
+        }
+      }
+
+      // now get the stats
+      matlab_float_sort(these_angles, these_angles, index_map);
+      float median = get_median_sorted(these_angles);
+      float p25 = get_percentile(these_angles, 25);
+      float p75 = get_percentile(these_angles, 75);
+      float mad = get_median_absolute_deviation(these_angles,median);
+
+      // junction_angle_stats[0].push_back(median);
+      // junction_angle_stats[1].push_back(p25);
+      // junction_angle_stats[2].push_back(p75);
+      // junction_angle_stats[3].push_back(mad);
+      cout << "Got the stats, writing to csv" << endl;
+
+      csv_out << outlet_jn << "," << SO << "," << deg(median) << "," << deg(p25) << "," << deg(p75) << "," << deg(mad) << endl;
+    }
+  }
+  csv_out.close();
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This gets the junction angle stats for all basins of a given size
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::calculate_junction_angle_statistics_for_order(LSDFlowInfo& FlowInfo, int BasinOrder,
+                             vector<int>& junction_list,
+                             vector<float>& junction_angle_averages,
+                             vector<float>& junction_angle_stderr,
+                             vector<int>& N_junctions)
+{
+  vector<float> jaavg;
+  vector<float> jastderr;
+  vector<int> N_j;
+
+  // get all the junctions of a given order
+  vector<int> OutletJunctions = ExtractBasinJunctionOrder(BasinOrder, FlowInfo);
+
+  // the required information
+  pair<vector<float>,vector<float> > JA_stats;
+
+  // now loop through these, getting the statistics of the upstream junctions.
+  vector<float> JA_info;
+  int n_outlets = int(OutletJunctions.size());
+  for(int i = 0; i<n_outlets; i++)
+  {
+    JA_info = calculate_junction_angle_statistics_upstream_of_junction(OutletJunctions[i], FlowInfo);
+    jaavg.push_back(JA_info[0]);
+    jastderr.push_back(JA_info[1]);
+    N_j.push_back( int(JA_info[2]) );
+  }
+
+  // replace the data vectors
+  junction_list = OutletJunctions;
+  junction_angle_averages = jaavg;
+  junction_angle_stderr = jastderr;
+  N_junctions = N_j;
+
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This prints junction angles to a csv file
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::print_junction_angles_to_csv(vector<int> JunctionList,
+                                                       LSDFlowInfo& FlowInfo,
+                                                       string csv_name)
+{
+  ofstream csv_out;
+  csv_out.open(csv_name.c_str());
+  csv_out.precision(9);
+
+
+  // get the junction information
+  map<int, vector<float> > JuncInfo = calculate_junction_angles(JunctionList, FlowInfo);
+  map<int, vector<float> >::iterator iter;
+  vector<float> this_JI;
+  int this_junc;
+  int this_node,curr_row,curr_col;
+  int jso, d1so, d2so;
+  double latitude, longitude;
+
+  csv_out << "latitude,longitude,junction_number,junction_stream_order,donor1_stream_order,donor2_stream_order,junction_angle" << endl;
+  for(iter = JuncInfo.begin(); iter != JuncInfo.end(); ++iter)
+  {
+    this_junc = iter->first;
+    this_JI = iter->second;
+
+    jso = int(this_JI[1]);
+    d1so = int(this_JI[2]);
+    d2so = int(this_JI[3]);
+
+    // get the row and column of the junction from the junction node
+    this_node = JunctionVector[this_junc];
+    LSDCoordinateConverterLLandUTM Converter;
+    FlowInfo.retrieve_current_row_and_col(this_node,curr_row,curr_col);
+    get_lat_and_long_locations(curr_row, curr_col, latitude,longitude, Converter);
+
+    // print to the csv file
+    csv_out << latitude <<"," << longitude <<"," << this_junc <<"," << jso << ","
+            << d1so << "," << d2so << "," << deg(this_JI[0]) << endl;
+  }
+
+  csv_out.close();
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function agregates junction level statistics for larger basins
+// Is primarily intended for use with junction angle code but could
+// also be used to get statistics about the different slopes or other
+// junction level statistics
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+/*
+int LSDJunctionNetwork::calculate_basin_averages_from_junction_list(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo)
+{
+
+  // loop through the basins getting the basin statistics.
+  int n_basin_junctions = int(BasinJunctions.size());
+  for (int jn = 0; jn<n_basin_junctions; j++)
+  {
+
+  }
+
+
+}
+*/
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function gets the junction index of a node.  If there is not a junction at this node
 // then it will give NoDataValue
 //
 // FC 31/10/13
 //
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 int LSDJunctionNetwork::get_Junction_of_Node(int Node, LSDFlowInfo& FlowInfo)
 {
   int JunctionNumber, Row, Col;
@@ -1295,7 +1686,58 @@ LSDIndexChannel LSDJunctionNetwork::generate_longest_index_channel_in_basin(int 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// this function takes a vector of basin junctions and returns a vector of the farthest
+// upstream source nodes
+//
+// FJC 21/03/17
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDJunctionNetwork::get_basin_sources_from_outlet_vector(vector<int> basin_junctions, LSDFlowInfo& FlowInfo,
+                           LSDRaster& dist_from_outlet)
+{
+  vector<int> basin_sources;
 
+  for (int i = 0; i < int(basin_junctions.size()); i++)
+  {
+    int basin_junction = basin_junctions[i];
+    cout << "This junction is: " << basin_junction << endl;
+    // if (basin_junction >= int(JunctionVector.size()))
+    // {
+    //   cout << "LSDJunctionNetwork::generate_longest_index_channel_in_basin junction not in list" << endl;
+    //   exit(EXIT_FAILURE);
+    // }
+    // first get the number of junctions upslope of the junction
+    vector<int> us_junctions = get_upslope_junctions(basin_junction);
+
+    int n_us_junctions = int(us_junctions.size());
+    int farthest_junc = basin_junction;
+    float farthest_dist = 0;
+    float current_dist;
+    int current_junc, current_row, current_col, current_node;
+
+    // loop through these junctions, looking for the one that is farthest from the outlet
+    for (int j = 0; j<n_us_junctions; j++)
+    {
+      current_junc = us_junctions[j];
+      current_node = JunctionVector[current_junc];
+      current_row = FlowInfo.RowIndex[current_node];
+      current_col = FlowInfo.ColIndex[current_node];
+      current_dist = dist_from_outlet.get_data_element(current_row,current_col);
+      if(current_dist > farthest_dist)
+      {
+        farthest_dist = current_dist;
+        farthest_junc = current_junc;
+      }
+    }
+    int start_junction_node = JunctionVector[farthest_junc];
+    basin_sources.push_back(start_junction_node);
+  }
+
+  return basin_sources;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // this function gets tributaries along a continous channel.
@@ -1809,17 +2251,44 @@ int LSDJunctionNetwork::get_Next_StreamOrder_Junction(int junction)
   return next_junc;
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This function checks whether a junction is upsream of another junction
+// SMM
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+bool LSDJunctionNetwork::is_junction_upstream(int current_junction, int test_junction)
+{
+  bool i = false;
+
+  int start_SVector_junction = SVectorIndex[current_junction];
+  int end_SVector_junction = start_SVector_junction+NContributingJunctions[current_junction];
+
+  int SVector_test_junction = SVectorIndex[test_junction];
+
+  for(int junction = start_SVector_junction; junction < end_SVector_junction; junction++)
+  {
+    if (junction == SVector_test_junction)
+    {
+      i = true;
+    }
+  }
+
+  return i;
+}
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 // This function checks whether a junction is at base level
 // FJC 11/01/2017
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 int LSDJunctionNetwork::is_Junction_BaseLevel(int junction)
 {
-	int base_level = 0;
-	int ReceiverJN = get_Receiver_of_Junction(junction);
-	if (junction == ReceiverJN) { base_level = 1; }
+  int base_level = 0;
+  int ReceiverJN = get_Receiver_of_Junction(junction);
+  if (junction == ReceiverJN) { base_level = 1; }
 
-	return base_level;
+  return base_level;
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
@@ -1847,6 +2316,51 @@ int LSDJunctionNetwork::get_Receiver_of_Junction(int junction) const
   }
   return ReceiverVector[junction];
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// Converting a junction list into a node list
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDJunctionNetwork::get_node_list_from_junction_list(vector<int> junction_list)
+{
+  int N_juncs = junction_list.size();
+  vector<int> node_list;
+  int this_junc;
+
+  for (int i = 0; i< N_juncs; i++)
+  {
+    this_junc = junction_list[i];
+    if (this_junc >= 0 && this_junc < int(JunctionVector.size()))
+    {
+      node_list.push_back(JunctionVector[this_junc]);
+    }
+  }
+
+  return node_list;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// Converting a junction list into a node list
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDJunctionNetwork::get_node_list_of_penultimate_node_from_junction_list(vector<int> junction_list, LSDFlowInfo& FlowInfo)
+{
+  int N_juncs = junction_list.size();
+  vector<int> node_list;
+  int this_junc;
+
+  for (int i = 0; i< N_juncs; i++)
+  {
+    this_junc = junction_list[i];
+    if (this_junc >= 0 && this_junc < int(JunctionVector.size()))
+    {
+      int outlet_node = get_penultimate_node_from_stream_link(this_junc,FlowInfo);
+      node_list.push_back(outlet_node);
+    }
+  }
+
+  return node_list;
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 // Function to get the junction downstream of the next
@@ -2025,7 +2539,7 @@ LSDIndexRaster LSDJunctionNetwork::ExtractBasinsOrder(int BasinOrder, LSDFlowInf
   }
   // Return raster with all nth order drainage basins.
   LSDIndexRaster basin_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,basins,GeoReferencingStrings);
-	return basin_raster;
+  return basin_raster;
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
@@ -2044,8 +2558,13 @@ vector<int> LSDJunctionNetwork::ExtractBasinJunctionOrder(int BasinOrder, LSDFlo
     // Note that the nth order basins are defined as capturing the full
     // drainage area for the nth order stream.  An nth order stream terminates
     // at a junction an order greater than order n.
+
     if (StreamOrderVector[junctionID] == BasinOrder)
     {
+      //cout << "Found a junction that is of the correct order." << endl;
+      //cout << "Junction is: " << junctionID << endl;
+      //cout << "This junction order is: " <<  StreamOrderVector[junctionID] << endl;
+
       // Get info from ChanelNetwork object regarding position of junction
       current_junc = junctionID;//JunctionVector[junctionID];
       receiver_junc = ReceiverVector[current_junc];
@@ -2055,9 +2574,52 @@ vector<int> LSDJunctionNetwork::ExtractBasinJunctionOrder(int BasinOrder, LSDFlo
       if (receiver_junc_SO > BasinOrder)
       {
         //use the node tester to get rid of any basins that are beheaded
-        if (node_tester(FlowInfo, current_junc) == false){
+        if (node_tester(FlowInfo, current_junc) == false)
+        {
           Junctions.push_back(current_junc);
         }
+      }
+    }
+  }
+
+  return Junctions;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This function extracts the juctions of all non-beheaded drainage basins
+// of a given order, n
+// It keeps basins that abut nodata values
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDJunctionNetwork::ExtractBasinJunctionOrderKeepEdgeBasins(int BasinOrder, LSDFlowInfo& FlowInfo)
+{
+  vector<int> Junctions;
+  // Loop through junction network until you reach nth order channel junction.
+
+  int current_junc,receiver_junc,receiver_junc_SO;
+  for (int junctionID=0; junctionID<NJunctions; ++junctionID)
+  {
+    // Loop through all stream junctions of the required basin order.
+    // Note that the nth order basins are defined as capturing the full
+    // drainage area for the nth order stream.  An nth order stream terminates
+    // at a junction an order greater than order n.
+
+    if (StreamOrderVector[junctionID] == BasinOrder)
+    {
+      //cout << "Found a junction that is of the correct order." << endl;
+      //cout << "Junction is: " << junctionID << endl;
+      //cout << "This junction order is: " <<  StreamOrderVector[junctionID] << endl;
+
+      // Get info from ChanelNetwork object regarding position of junction
+      current_junc = junctionID;//JunctionVector[junctionID];
+      receiver_junc = ReceiverVector[current_junc];
+      receiver_junc_SO = StreamOrderVector[receiver_junc];
+      // Identify outlet of nth order basin using the condition that the
+      // receiver junction should be of higher order.
+      if (receiver_junc_SO > BasinOrder)
+      {
+        Junctions.push_back(current_junc);
       }
     }
   }
@@ -3828,7 +4390,7 @@ LSDRaster LSDJunctionNetwork::ExtractRidges(LSDFlowInfo& FlowInfo, int& min_orde
   // set min_order to 1
   if (min_order > max_order){
       min_order = 1;
-      cout << "min_order larger than max_order, min_order set to 1" << endl;
+      cout << "\tmin_order larger than max_order, min_order set to 1" << endl;
   }
 
   // test the upper limit against the maximum possible value and set
@@ -3838,7 +4400,7 @@ LSDRaster LSDJunctionNetwork::ExtractRidges(LSDFlowInfo& FlowInfo, int& min_orde
       MaxStreamOrder = max_order;
   }
   else if(max_order > MaxStreamOrder){
-      cout << "max_order exceeds stream orders found in dem, max_order set to "
+      cout << "\tmax_order exceeds stream orders found in dem, max_order set to "
       << MaxStreamOrder << endl;
   }
 
@@ -4359,6 +4921,7 @@ void LSDJunctionNetwork::TypologyModel(LSDFlowInfo& FlowInfo, vector<int> Source
       if (node_test == 1)
       {
         //assign the catchID and hydrocode of this source
+        cout << "Catch ID: " << CatchIDs[j] << " Hydro code: " << HydroCodes[j] << endl;
         CatchID = CatchIDs[j];
         HydroCode = HydroCodes[j];
       }
@@ -4681,7 +5244,7 @@ void LSDJunctionNetwork::remove_tributary_segments(LSDFlowInfo& FlowInfo, vector
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDJunctionNetwork::print_channel_segments_to_csv(LSDFlowInfo& FlowInfo, vector <vector <int> > SegmentInfoInts, vector <vector <float> > SegmentInfoFloats, string outfilename)
 {
-  // fid the last '.' in the filename to use in the scv filename
+  // fid the last '.' in the filename to use in the csv filename
   unsigned dot = outfilename.find_last_of(".");
 
   string prefix = outfilename.substr(0,dot);
@@ -5367,7 +5930,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
   int this_NI;
   int row,col;
   int NNodes = int(NIvec.size());
-  cout << "The number of nodes is: " << NNodes << endl;
+  //cout << "The number of nodes is: " << NNodes << endl;
   for(int node = 0; node<NNodes; node++)
   {
     this_NI = NIvec[node];
@@ -5381,10 +5944,6 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
   WriteData.close();
 
 }
-
-
-
-
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -5750,10 +6309,17 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_Edge(vector<int>& BaseLevelJunct
 
       for(int i_donor = 0; i_donor < N_Donors; ++ i_donor)
       {
-        bool IsTruncated = node_tester(FlowInfo,DonorJunctions[i_donor]);
-        if(IsTruncated == true)
+        if (DonorJunctions[i_donor] == BaseLevelJunctions_Initial[i])
         {
-          keep_base_level_node = false;
+          //cout << "This is a baselevel junction." << endl;
+        }
+        else
+        {
+          bool IsTruncated = node_tester(FlowInfo,DonorJunctions[i_donor]);
+          if(IsTruncated == true)
+          {
+            keep_base_level_node = false;
+          }
         }
       }
     }
@@ -5770,6 +6336,349 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_Edge(vector<int>& BaseLevelJunct
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This prunes a list of baselevel junctions by removing juntions that have
+// basins bouned by NoData.
+// It seeks to remove basins draining from the edge.
+// Similar to the previous function but this one ignores the outlet reach
+// because in DEMs draining to a cut edge it is common to have a nodata
+// node near the outlet.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_Edge_Ignore_Outlet_Reach(vector<int>& BaseLevelJunctions_Initial,
+                                              LSDFlowInfo& FlowInfo, LSDRaster& TestRaster)
+{
+  vector<int> BL_Donor_junctions_pruned;
+  int N_BaseLevelJuncs = int(BaseLevelJunctions_Initial.size());
+  //cout << endl << endl << "I am going to remove any basins draining to the edge, ignoring the outlet reach." << endl;
+
+  for(int i = 0; i < N_BaseLevelJuncs; ++i)
+  {
+    //cout << "I'm checking node " << i << " to see if it is truncated." << endl;
+    bool keep_base_level_node = true;
+
+    // get donor nodes to base level nodes node
+    vector<int> DonorJunctions = get_donor_nodes(BaseLevelJunctions_Initial[i]);
+    int N_Donors = int(DonorJunctions.size());
+    //cout << "Looking at baselevel junction: " << BaseLevelJunctions_Initial[i] << " It has " << N_Donors << " donor junctions." << endl;
+
+    if (N_Donors == 1)    // this is a tiny base level node with no donors, we won't keep it.
+    {
+      //cout << "This is a base level junction! Junction is: " << BaseLevelJunctions_Initial[i] << endl
+      //     << "and donor is: " << DonorJunctions[0] << endl;
+      keep_base_level_node = false;
+    }
+    else
+    {
+      // get the node indices of the donors
+      for (int i_donor = 0; i_donor<N_Donors; i_donor++)
+      {
+        //cout << "Donor " << i_donor << " of " << N_Donors << " and junction is: " << DonorJunctions[i_donor] << endl;
+
+        // make sure you are not getting the baselevl node since it will certainly
+        // have nodata bounding it.
+        if(DonorJunctions[i_donor] != BaseLevelJunctions_Initial[i])
+        {
+          int this_NI = JunctionVector[ DonorJunctions[i_donor] ];
+          bool is_influenced_by_nodata = FlowInfo.is_upstream_influenced_by_nodata(this_NI, TestRaster);
+          if (is_influenced_by_nodata)
+          {
+            //cout << "This node has a NoData influence upslope." << endl;
+            keep_base_level_node = false;
+          }
+        }
+      }
+    }
+
+    // Keep this baselelvel node if it is true
+    if(keep_base_level_node == true)
+    {
+      BL_Donor_junctions_pruned.push_back(BaseLevelJunctions_Initial[i]);
+    }
+  }
+  //cout << "I have removed the channels that are draining from the edge of the DEM." << endl;
+  //cout << "I now have " << BL_Donor_junctions_pruned.size() << " base level junctions" << endl;
+  return BL_Donor_junctions_pruned;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function loops through all basins and takes the largest basin
+// in each baselevel basin that is not influenced by nodata
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_To_Largest_Complete_Basins(vector<int>& BaseLevelJunctions_Initial,
+                                              LSDFlowInfo& FlowInfo, LSDRaster& TestRaster, LSDIndexRaster& FlowAcc)
+{
+  // We will loop through each basin. We get all the junctions in the basin
+  // we then test if each is influenced by nodata: we then keep the largest one
+  // influence by nodata
+  vector<int> pruned_basin_list;
+  int this_pruned_basin;
+  int N_BL_Nodes = int(BaseLevelJunctions_Initial.size());
+  for(int BLJ = 0; BLJ<N_BL_Nodes; BLJ++)
+  {
+    // get all the donor junctions. We need to have the baselevel junction
+    // first so we have to append the upslope junctions after that
+    vector<int> upslope_juncs;
+    upslope_juncs.push_back(BaseLevelJunctions_Initial[BLJ]);
+    vector<int> new_upslope_juncs = get_upslope_junctions( BaseLevelJunctions_Initial[BLJ] );
+    upslope_juncs.insert(upslope_juncs.end(), new_upslope_juncs.begin(), new_upslope_juncs.end());
+
+    // get the flow accumulation from each of these basins
+    vector<int> contributing_pixels_junctions = get_contributing_pixels_from_specified_junctions(upslope_juncs,
+                                                     FlowInfo, FlowAcc);
+
+    int NDValue = -99;
+    this_pruned_basin = NDValue;
+
+    int N_total_juncs = int(upslope_juncs.size());
+    int max_contributing_pixels = 0;
+
+    // loop thyrough all the upslope junctions, testing if they are
+    // influenced by the edge and how many contributing pixels they have
+    for(int this_junc_index = 0; this_junc_index< N_total_juncs; this_junc_index++)
+    {
+      // get the current node index
+      int this_NI = JunctionVector[ upslope_juncs[this_junc_index] ];
+      bool is_influenced_by_nodata = FlowInfo.is_upstream_influenced_by_nodata(this_NI, TestRaster);
+
+      // only record data if it is not influenced by nodata
+      if (not is_influenced_by_nodata)
+      {
+        // only record data if it is bigger than the previous biggest node
+        if( contributing_pixels_junctions[this_junc_index] > max_contributing_pixels)
+        {
+          max_contributing_pixels =  contributing_pixels_junctions[this_junc_index];
+          this_pruned_basin = upslope_juncs[this_junc_index];
+        }
+      }
+    }
+
+    // only keep the basin if it has a sensible junction number
+    if(this_pruned_basin != NDValue)
+    {
+      pruned_basin_list.push_back(this_pruned_basin);
+    }
+  }
+
+  return pruned_basin_list;
+
+}
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function loops through all basins and takes the largest basin
+// in each baselevel basin that is not influenced by nodata
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window(vector<int>& Junctions_Initial,
+                                              LSDFlowInfo& FlowInfo, LSDIndexRaster& FlowAcc,
+                                              int lower_limit, int upper_limit)
+{
+
+  // get the flow accumulation (in pixels) from each of these basins
+  vector<int> contributing_pixels_junctions = get_contributing_pixels_from_specified_junctions(Junctions_Initial,
+                                                     FlowInfo, FlowAcc);
+
+  // We will loop through each basin. We get all the junctions in the basin
+  // we then test if each is influenced by nodata: we then keep the largest one
+  // influence by nodata
+  vector<int> pruned_basin_list;
+  int this_CP;
+  int N_J = int(contributing_pixels_junctions.size());
+
+  // loop through all the basins getting the ones in the size window
+  int min_basin_size = 1000000000;
+  int max_basin_size = 0;
+  for(int J = 0; J<N_J; J++)
+  {
+    this_CP = contributing_pixels_junctions[J];
+
+    if(this_CP > max_basin_size)
+    {
+      max_basin_size = this_CP;
+    }
+    if(this_CP < min_basin_size)
+    {
+      min_basin_size = this_CP;
+    }
+
+    //cout << "Junction in BL list["<< J << "] has " << this_CP << " contributing pixels" << endl;
+
+    // if the junction is within the contributing pixel window, keep it.
+    if( this_CP >= lower_limit && this_CP < upper_limit)
+    {
+      pruned_basin_list.push_back( Junctions_Initial[J] );
+    }
+  }
+
+  if(  pruned_basin_list.size() == 0)
+  {
+    cout << "LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window" << endl;
+    cout << "I have failed to find any basins meeting your criteria. " << endl;
+    cout << "The maximum basin in this DEM is: " << max_basin_size
+         << " and the minimum is: " << min_basin_size << " pixels." << endl;
+  }
+
+  return pruned_basin_list;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function loops through all basins and takes the largest basin
+// in each baselevel basin that is not influenced by nodata
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(LSDFlowInfo& FlowInfo,
+                                              LSDRaster& TestRaster, LSDIndexRaster& FlowAcc,
+                                              int lower_limit, int upper_limit)
+{
+
+  // We use ALL the junctions for this operation
+  vector<int> Junctions_Initial;
+  for (int i = 0; i< NJunctions; i++)
+  {
+    Junctions_Initial.push_back(i);
+  }
+
+  // get the flow accumulation (in pixels) from each of these basins
+  cout << "First let me prune within the contributing area window." << endl;
+  cout << " I'm starting with " << Junctions_Initial.size() << " junctions." << endl;
+  cout << "The lower limit is: " << lower_limit << " and upper limit "<< upper_limit << endl;
+  vector<int> first_pruning = Prune_Junctions_By_Contributing_Pixel_Window(Junctions_Initial,FlowInfo,
+                                              FlowAcc, lower_limit, upper_limit);
+  cout << "Right, I've pruned those and have " << first_pruning.size() << " junctions left." << endl;
+
+  // So now we need to prune the basins bounded by nodata, and prune the nested
+  // basins. Which to do first? The nodata pruning is computationally expensive:
+  // it requires a search of all the pixels in a basin. But the problem is
+  // that if we prune by nesting we might remove a load of basins in a large
+  // basin that are nested, only for that large basin to be removed later by the
+  // nodata pruning. So even though it will be slow we need to prune by
+  // nodata first.
+  cout << "Now I am going to see if any are draining to the edge. " << endl;
+  int N_total_juncs = int(first_pruning.size());
+  vector<int> second_pruning;
+  for(int this_junc_index = 0; this_junc_index< N_total_juncs; this_junc_index++)
+  {
+    // get the current node index
+    int this_NI = JunctionVector[ first_pruning[this_junc_index] ];
+    bool is_influenced_by_nodata = FlowInfo.is_upstream_influenced_by_nodata(this_NI, TestRaster);
+
+    // only record data if it is not influenced by nodata
+    if (not is_influenced_by_nodata)
+    {
+      second_pruning.push_back( first_pruning[this_junc_index] );
+    }
+  }
+  cout << "I now have " << second_pruning.size() << " Junctions left." << endl;
+
+  // Now prune based on nesting
+  cout << "Now I'm pruning out any nested junctions." << endl;
+  vector<int> third_pruning = Prune_Junctions_If_Nested(second_pruning,FlowInfo, FlowAcc);
+  cout << "Finished with pruning, I have " << third_pruning.size() << " junctions left." << endl;
+  return third_pruning;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function takes a list of junctions and then prunes them on the basis
+// of whether they are nested. Nested junctions are eliminated.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_If_Nested(vector<int>& Junctions_Initial,
+                                      LSDFlowInfo& FlowInfo, LSDIndexRaster& FlowAcc)
+{
+  // Find out how many junctions there are
+  int N_Juncs = int(Junctions_Initial.size());
+  //cout << "There are " << N_Juncs << " Junctions, from which I'll compare" << endl;
+
+  // get the contributing pixels of these junctions
+  // get the flow accumulation (in pixels) from each of these basins
+  vector<int> contributing_pixels_junctions = get_contributing_pixels_from_specified_junctions(Junctions_Initial,
+                                                     FlowInfo, FlowAcc);
+
+
+  // now get all the possible two pair combinations of these junctions
+  bool zero_indexed = true;   // this is just because the junction indices are numbered from zero
+  int k = 2;                  // We want combinations of 2 junctions
+
+  // the vec vec holds a vector of each possible combination of channels
+  // each vector has two elements in it: the first and second channel in the comibination
+  vector< vector<int> > combo_vecvec = combinations(N_Juncs, k, zero_indexed);
+
+  //cout << "The combo vecvec has: " << combo_vecvec.size() << " elements" << endl;
+
+  //vector<int> combo_first = combo_vecvec[0];
+  //vector<int> combo_second = combo_vecvec[1];
+  //cout << "Running through combinations, of which there are: " << combo_first.size() << endl;
+
+
+  // get the number of combinations
+  int N_combinations = int(combo_vecvec.size());
+
+  // loop through all the combinations. There is always a bigger and smaller junction
+  // in the combination. We store these in bigger smaller
+  vector<int> bigger;
+  vector<int> smaller;
+
+  int first_index;
+  int second_index;
+
+  for (int i = 0; i<N_combinations; i++)
+  {
+
+    // get the indices into the junction vector of all the combinations
+    first_index = combo_vecvec[i][0];
+    second_index = combo_vecvec[i][1];
+    if ( contributing_pixels_junctions[ first_index ] > contributing_pixels_junctions[ second_index ])
+    {
+      bigger.push_back(first_index);
+      smaller.push_back(second_index);
+    }
+    else
+    {
+      bigger.push_back(second_index);
+      smaller.push_back(first_index);
+    }
+  }
+
+  map<int,int> Nested_Junctions;
+  bool is_upstream;
+  // now we loop through all combos, looking for  nested basins
+  for (int i = 0; i<N_combinations; i++)
+  {
+    // Only check if the junction has not already been found to be nested
+    if ( Nested_Junctions.find( smaller[i] ) == Nested_Junctions.end() )
+    {
+
+      // If it is upstream, add it to the nested map
+      is_upstream = is_junction_upstream(Junctions_Initial[ bigger[i] ], Junctions_Initial[ smaller[i] ]);
+      if(is_upstream)
+      {
+        Nested_Junctions[ smaller[i] ] = 1;
+      }
+    }
+  }
+
+  // Now loop thrugh all the junctions, checking to see if they are nested
+  vector<int> non_nested_junctions;
+  for (int i = 0; i<N_Juncs; i++)
+  {
+    // keep the junctions that are not in the nested junctions map
+    if ( Nested_Junctions.find( i ) == Nested_Junctions.end() )
+    {
+      non_nested_junctions.push_back( Junctions_Initial[i]);
+    }
+  }
+  return non_nested_junctions;
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This prunes a list of baselevel junctions by removing junctions whose
 // contributing pixels are less than a threshold
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -5779,6 +6688,7 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_Area(vector<int>& BaseLevelJunct
   vector<int> BL_Donor_junctions_pruned;
   int N_BaseLevelJuncs = int(BaseLevelJunctions_Initial.size());
   cout << endl << endl << "I am going to remove any basins smaller than " << Threshold << " pixels." << endl;
+  cout << "We are starting with: " << N_BaseLevelJuncs << " juntions." << endl;
 
   int row,col, current_node;
 
@@ -5845,6 +6755,128 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_Largest(vector<int>& BaseLevelJu
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This prunes a list of baselevel junctions by selecting only those junctions
+// that are above or below (depending on the bool keep_junctions_below_threshold)
+// a threshold elevation
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_Threshold_Elevation(vector<int>& BaseLevelJunctions_Initial,
+                                              LSDFlowInfo& FlowInfo, LSDRaster& Elev,
+                                              float threshold_elevation, bool keep_junctions_below_threshold)
+{
+  vector<int> BL_Donor_junctions_pruned;
+  int N_BaseLevelJuncs = int(BaseLevelJunctions_Initial.size());
+
+  int row,col, current_node;
+  if(BaseLevelJunctions_Initial.size() <= 0)
+  {
+    cout << "I am afraid you have no junctions in your junction list. Exiting." << endl;
+    exit(0);
+  }
+
+
+  for(int i = 0; i < N_BaseLevelJuncs; ++i)
+  {
+    current_node = JunctionVector[BaseLevelJunctions_Initial[i]];
+    FlowInfo.retrieve_current_row_and_col(current_node,row,col);
+
+    float this_elevation = Elev.get_data_element(row,col);
+
+    cout << "Junction: " <<  BaseLevelJunctions_Initial[i] << " and elevation is: " << this_elevation << endl;
+
+    if (keep_junctions_below_threshold)
+    {
+      if (this_elevation <= threshold_elevation)
+      {
+        BL_Donor_junctions_pruned.push_back(BaseLevelJunctions_Initial[i]);
+      }
+    }
+    else
+    {
+      if (this_elevation >= threshold_elevation)
+      {
+        BL_Donor_junctions_pruned.push_back(BaseLevelJunctions_Initial[i]);
+      }
+    }
+  }
+
+  return BL_Donor_junctions_pruned;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This prunes a list of baselevel junctions by selecting only those junctions
+// that are within an elevation window
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_Elevation_Window(vector<int>& BaseLevelJunctions_Initial,
+                                              LSDFlowInfo& FlowInfo, LSDRaster& Elev,
+                                              float lower_threshold, float upper_threshold)
+{
+  vector<int> BL_Donor_junctions_pruned;
+  int N_BaseLevelJuncs = int(BaseLevelJunctions_Initial.size());
+
+  int row,col, current_node;
+  if(BaseLevelJunctions_Initial.size() <= 0)
+  {
+    cout << "I am afraid you have no junctions in your junction list. Exiting." << endl;
+    exit(0);
+  }
+
+
+  for(int i = 0; i < N_BaseLevelJuncs; ++i)
+  {
+    current_node = JunctionVector[BaseLevelJunctions_Initial[i]];
+    FlowInfo.retrieve_current_row_and_col(current_node,row,col);
+
+    float this_elevation = Elev.get_data_element(row,col);
+
+    cout << "Junction: " <<  BaseLevelJunctions_Initial[i] << " and elevation is: " << this_elevation;
+
+    if (this_elevation >= lower_threshold && this_elevation <= upper_threshold)
+    {
+      cout << " KEEPING this one." << endl;
+      BL_Donor_junctions_pruned.push_back(BaseLevelJunctions_Initial[i]);
+    }
+    else
+    {
+      cout << " NOT keeping that one. " << endl;
+    }
+  }
+
+  return BL_Donor_junctions_pruned;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function returns a vector of the contributing pixels from a list
+// of junctions
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::get_contributing_pixels_from_specified_junctions(vector<int>& JunctionList,
+                                              LSDFlowInfo& FlowInfo, LSDIndexRaster& FlowAcc)
+{
+  int N_Juncs = int(JunctionList.size());
+  int row,col, current_node;
+  vector<int> N_contributing_pixels;
+  if(JunctionList.size() <= 0)
+  {
+    cout << "I am afraid you have no junctions in your junction list. Exiting." << endl;
+  }
+  else
+  {
+    for(int i = 0; i < N_Juncs; ++i)
+    {
+      current_node = JunctionVector[JunctionList[i]];
+      FlowInfo.retrieve_current_row_and_col(current_node,row,col);
+
+      // get the flow accumulation
+      N_contributing_pixels.push_back(FlowAcc.get_data_element(row,col));
+    }
+  }
+
+  return N_contributing_pixels;
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // GET RECEIVER JUNCTION FOR SPECIFIED COORDINATES
@@ -5879,6 +6911,29 @@ int LSDJunctionNetwork::get_receiver_junction_for_specified_coordinates(float X_
     if(junction != NoDataValue) ++at_junction;
   }
   return junction;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Get node index of nearest channel for specified coordinates
+// for lat long
+// FJC 20/11/17
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+int LSDJunctionNetwork::get_junction_of_nearest_channel_from_lat_long(double latitude, double longitude, LSDFlowInfo& FlowInfo, LSDCoordinateConverterLLandUTM Converter)
+{
+  double this_Northing, this_Easting;
+  int UTM_zone;
+  bool is_North;
+  FlowInfo.get_UTM_information(UTM_zone, is_North);
+  int eId = 22;             // defines the ellipsiod. This is WGS
+  Converter.LLtoUTM_ForceZone(eId, latitude, longitude,
+                    this_Northing, this_Easting, UTM_zone);
+
+  // now get the nearest channel node
+  int this_junc = get_receiver_junction_for_specified_coordinates(this_Easting, this_Northing, FlowInfo);
+
+  return this_junc;
+
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -5952,7 +7007,7 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
     // loop until you find a channel
     while(NearestChannel == NoDataValue && CurrentNode != ReceiverNode)
     {
-      cout << "Found a channel" << endl;
+      //cout << "Found a channel" << endl;
       // now move down one node
       CurrentNode = ReceiverNode;
 
@@ -5994,7 +7049,7 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
       else    // get the next node
       {
         FlowInfo.retrieve_receiver_information(CurrentNode, ReceiverNode, ReceiverRow, ReceiverCol);
-        cout << "CurrentNode: " << CurrentNode << " RN: " << ReceiverNode << endl;
+        //cout << "CurrentNode: " << CurrentNode << " RN: " << ReceiverNode << endl;
       }
     }
   }
@@ -6879,7 +7934,7 @@ float LSDJunctionNetwork::find_distance_to_nearest_floodplain_pixel(int point_no
 	{
 		distance = upstream_dist*-1;
 	}
-	else
+  else
 	{
 		cout << "I couldn't find a FIP within the search radius, returning NDV" << endl;
 		distance = NoDataValue;
@@ -6889,11 +7944,67 @@ float LSDJunctionNetwork::find_distance_to_nearest_floodplain_pixel(int point_no
 	cout << "Got the distance for this FIP" << endl;
 }
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 // END OF FLOODPLAIN FUNCTIONS
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This function prints all junctions to a csv file
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, string fname)
+{
+
+  int this_node;
+  int row,col;
+  double x_loc,y_loc;
+  double latitude,longitude;
+
+  vector<int> JunctionList;
+  for (int i = 0; i<NJunctions; i++)
+  {
+    JunctionList.push_back(i);
+    //cout << "The stream order of junction " << i << " is " << StreamOrderVector[i] << endl;
+  }
+
+  // open the outfile
+  ofstream sources_out;
+  sources_out.open(fname.c_str());
+  sources_out.precision(9);
+
+  sources_out << "junction,node,x,y,latitude,longitude, stream_order" << endl;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+  for (int i = 0; i<NJunctions; i++)
+  {
+    this_node = get_Node_of_Junction(JunctionList[i]);
+
+    // get the row and column
+    FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+
+    // get the x and y locations
+    FlowInfo.get_x_and_y_locations(row, col, x_loc, y_loc);
+
+    // get the lat and long locations
+    FlowInfo.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+
+    // print to file
+    sources_out << JunctionList[i] << "," << this_node << "," << x_loc << ","
+                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] << endl;
+
+  }
+  sources_out.close();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This function takes a list of junctions and prints them to a csv file
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -6921,7 +8032,7 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
   sources_out.open(fname.c_str());
   sources_out.precision(9);
 
-  sources_out << "junction,node,x,y,latitude,longitude" << endl;
+  sources_out << "junction,node,x,y,latitude,longitude,stream_order" << endl;
 
   // this is for latitude and longitude
   LSDCoordinateConverterLLandUTM Converter;
@@ -6941,7 +8052,7 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
 
     // print to file
     sources_out << JunctionList[i] << "," << this_node << "," << x_loc << ","
-                << y_loc << "," << latitude << "," << longitude << endl;
+                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] << endl;
 
   }
 
@@ -6954,6 +8065,17 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is for calculating a bonehead version of the chi slope
 // and the chi intercept
+//
+// What this does is it takes a list of baselevel junctions
+// It then finds all sources in the basin
+// It then sorts these according to length
+// Starting with the longest channel it moves down marking channels as read
+// For all but the longest channel, it will eventually come upon a channel that has
+// already been visited. So it will stop there.
+// BUT we want to keep a few chi nodes downslope (to make sure there are not
+// big jumps in chi at tributary junctions)
+// so it follows the visited channel down a few nodes. It does this using the
+// flowinfo function   get_downslope_node_after_fixed_visited_nodes
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
                                     vector<int> BaseLevel_Junctions,
@@ -6977,11 +8099,11 @@ void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
   for (int BL = 0; BL < N_baselevel_nodes; BL++)
   {
     int outlet_node = JunctionVector[BaseLevel_Junctions[BL] ];
-    cout << "The outlet node is: " << outlet_node << endl;
+    //cout << "The outlet node is: " << outlet_node << endl;
 
     // get all the source nodes of the base level
     vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
-    cout << "The number of sources is: " << source_nodes.size() << endl;
+    //cout << "The number of sources is: " << source_nodes.size() << endl;
 
 
     // sort the nodes by flow distance in ascending order
@@ -6999,8 +8121,8 @@ void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
       thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
                   outlet_node, n_nodes_to_visit, VisitedRaster);
 
-      cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
-           << " and new outlet: " << thisOutlet << endl;
+      //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
+      //     << " and new outlet: " << thisOutlet << endl;
 
 
       NewSources.push_back(SortedSources[s]);
@@ -7012,6 +8134,250 @@ void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
   outlet_nodes = NewOutlets;
   source_nodes = NewSources;
 }
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is for calculating a bonehead version of the chi slope
+// and the chi intercept
+// overlaoded, overwrite the baselevel nodes vector (used for visualisation).
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    vector<int>& baselevel_nodes,
+                                    int n_nodes_to_visit)
+{
+  // Get the number of baselevel nodes
+  int N_baselevel_nodes = int(BaseLevel_Junctions.size());
+
+  // create the visited array
+  int not_visited = 0;
+  LSDIndexRaster VisitedRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, GeoReferencingStrings,not_visited);
+
+  vector<int> NewSources;
+  vector<int> NewOutlets;
+  vector<int> NewBaselevelNodes;
+  int thisOutlet;
+
+  // loop through these nodes
+  for (int BL = 0; BL < N_baselevel_nodes; BL++)
+  {
+    int outlet_node = JunctionVector[BaseLevel_Junctions[BL] ];
+    //cout << "The outlet node is: " << outlet_node << endl;
+
+    // get all the source nodes of the base level
+    vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
+    //cout << "The number of sources is: " << source_nodes.size() << endl;
+
+
+    // sort the nodes by flow distance in ascending order
+    vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
+
+    // get them in descending order
+    reverse(SortedSources.begin(),SortedSources.end());
+
+    // now loop through the sorted sources
+    int n_sources = int(SortedSources.size());
+
+    for(int s = 0; s<n_sources; s++)
+    {
+      // get the channel from this source and mark up the covered raster
+      thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
+                  outlet_node, n_nodes_to_visit, VisitedRaster);
+
+      //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
+      //     << " and new outlet: " << thisOutlet << endl;
+
+
+      NewSources.push_back(SortedSources[s]);
+      NewOutlets.push_back(thisOutlet);
+      NewBaselevelNodes.push_back(outlet_node);
+    }
+
+  }
+
+  outlet_nodes = NewOutlets;
+  source_nodes = NewSources;
+  baselevel_nodes = NewBaselevelNodes;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is for calculating a bonehead version of the chi slope
+// and the chi intercept and is written for the condition that baselevel junctions
+// have been specified by the user
+// MDH 19/6/17
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::get_overlapping_channels_to_downstream_outlets(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    int n_nodes_to_visit)
+{
+  // Get the number of baselevel nodes
+  int N_baselevel_nodes = int(BaseLevel_Junctions.size());
+
+  // create the visited array
+  int not_visited = 0;
+  LSDIndexRaster VisitedRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, GeoReferencingStrings,not_visited);
+
+  vector<int> NewSources;
+  vector<int> NewOutlets;
+  int thisOutlet;
+
+  // loop through these nodes
+  for (int BL = 0; BL < N_baselevel_nodes; BL++)
+  {
+    int outlet_node = get_penultimate_node_from_stream_link(BaseLevel_Junctions[BL],FlowInfo);
+    //cout << "The outlet node is: " << outlet_node << endl;
+
+    // get all the source nodes of the base level
+    vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
+    //cout << "The number of sources is: " << source_nodes.size() << endl;
+
+
+    // sort the nodes by flow distance in ascending order
+    vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
+
+    // get them in descending order
+    reverse(SortedSources.begin(),SortedSources.end());
+
+    // now loop through the sorted sources
+    int n_sources = int(SortedSources.size());
+
+    for(int s = 0; s<n_sources; s++)
+    {
+      // get the channel from this source and mark up the covered raster
+      thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
+                  outlet_node, n_nodes_to_visit, VisitedRaster);
+
+      //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
+      //     << " and new outlet: " << thisOutlet << endl;
+
+
+      NewSources.push_back(SortedSources[s]);
+      NewOutlets.push_back(thisOutlet);
+    }
+
+  }
+
+  outlet_nodes = NewOutlets;
+  source_nodes = NewSources;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is for calculating a bonehead version of the chi slope
+// and the chi intercept and is written for the condition that baselevel junctions
+// have been specified by the user
+// Overloaded version that spits out the baselevel nodes as well.
+// This is a bit screwy as the baslevel node will be the next junction down
+//
+// This is working now but need to check if going upstream on junction leads
+// to funny basin shapes
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::get_overlapping_channels_to_downstream_outlets(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    vector<int>& baselevel_nodes,
+                                    int n_nodes_to_visit)
+{
+  // Get the number of baselevel nodes
+  int N_baselevel_nodes = int(BaseLevel_Junctions.size());
+
+  // create the visited array
+  int not_visited = 0;
+  LSDIndexRaster VisitedRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, GeoReferencingStrings,not_visited);
+
+  vector<int> NewSources;
+  vector<int> NewOutlets;
+  vector<int> NewBaselevelNodes;
+  int thisOutlet;
+  //int outlet_junction;
+
+  // loop through these nodes
+  for (int BL = 0; BL < N_baselevel_nodes; BL++)
+  {
+    int outlet_node = get_penultimate_node_from_stream_link(BaseLevel_Junctions[BL],FlowInfo);
+    int outlet_junction_node = JunctionVector[BaseLevel_Junctions[BL] ];
+    //cout << "The outlet node is: " << outlet_node << endl;
+
+    // get all the source nodes of the base level
+    vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
+    //cout << "The number of sources is: " << source_nodes.size() << endl;
+
+
+    // sort the nodes by flow distance in ascending order
+    vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
+
+    // get them in descending order
+    reverse(SortedSources.begin(),SortedSources.end());
+
+    // now loop through the sorted sources
+    int n_sources = int(SortedSources.size());
+
+    for(int s = 0; s<n_sources; s++)
+    {
+      // get the channel from this source and mark up the covered raster
+      thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
+                  outlet_node, n_nodes_to_visit, VisitedRaster);
+
+      //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
+      //     << " and new outlet: " << thisOutlet << endl;
+
+
+      NewSources.push_back(SortedSources[s]);
+      NewOutlets.push_back(thisOutlet);
+
+
+      //cout << "Search for Heybubba: This will probably cause a segfault. It needs to be a junction!" << endl;
+      NewBaselevelNodes.push_back(outlet_junction_node);
+
+    }
+
+  }
+
+  outlet_nodes = NewOutlets;
+  source_nodes = NewSources;
+  baselevel_nodes = NewBaselevelNodes;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function takes in two vectors with the rows and cols of a line and finds
+//the pixels along the line >= a threshold stream order
+// FJC 16/04/17
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::get_channel_pixels_along_line(vector<int> line_rows, vector<int> line_cols, int threshold_SO, LSDFlowInfo& FlowInfo)
+{
+  vector<int> outlet_nodes;
+  int n_pixels = line_rows.size();
+  int this_NI = 0;
+  cout << "Returning the points on the line with a SO >= " << threshold_SO << endl;
+
+  //for each pixel along the line, check if the SO is greater than the threshold
+  for (int i = 0; i < n_pixels; i++)
+  {
+    int NI = FlowInfo.retrieve_node_from_row_and_column(line_rows[i], line_cols[i]);
+    if (this_NI != NI)  // check for duplicates
+    {
+      int this_SO = get_StreamOrder_of_Node(FlowInfo, NI);
+      if (this_SO >= threshold_SO)
+      {
+        //push back the node to the outlet
+        outlet_nodes.push_back(NI);
+      }
+      this_NI = NI;
+    }
+  }
+
+  return outlet_nodes;
+}
 
 #endif
