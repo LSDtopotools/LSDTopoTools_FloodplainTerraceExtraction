@@ -543,6 +543,49 @@ void LSDTerrace::print_TerraceAreas_to_file(string filename, LSDFlowInfo& FlowIn
 	}
 	output_file.close();
 }
+
+//----------------------------------------------------------------------------------------
+// Get the nearest channel node on the baseline channel to each terrace pixel
+// FJC 30/11/17
+//----------------------------------------------------------------------------------------
+Array2D<int> LSDTerrace::get_ChannelNodeArray(LSDSwath& Swath, Array2D<float> BaselineDistanceArray, LSDFlowInfo& FlowInfo)
+{
+	Array2D<int> BaselineNodes(NRows,NCols,NoDataValue);
+
+	// get the baseline values, rows, and cols
+	vector<int> BaselineRows = Swath.get_BaselineRows();
+	vector<int> BaselineCols = Swath.get_BaselineCols();
+	vector<float> BaselineValue = Swath.get_BaselineValue();
+	vector<float> BaselineDistance = Swath.get_DistanceAlongBaseline();
+
+	cout << "N baseline rows: " << BaselineRows.size() << " N baseline cols: " << BaselineCols.size() << " baseline distance vector length: " << BaselineDistance.size() << endl;
+
+	// loop through the terrace nodes, and find their position on the channel.
+	for (int i = 0; i < NRows; i++)
+	{
+		for (int j = 0; j < NCols; j++)
+		{
+			// find the baseline dist of this node
+			if (ConnectedComponents_Array[i][j] != NoDataValue)
+			{
+				float this_dist = BaselineDistanceArray[i][j];
+				//cout << this_dist << endl;
+				vector<float>::iterator find_it;
+				find_it = find(BaselineDistance.begin(), BaselineDistance.end(), this_dist);
+				if (find_it != BaselineDistance.end())
+				{
+					int idx = distance(BaselineDistance.begin(), find_it);
+					int BaselineNode = FlowInfo.retrieve_node_from_row_and_column(BaselineRows[idx], BaselineCols[idx]);
+					//cout << "baseline node: " << BaselineNode << endl;
+					BaselineNodes[i][j] = BaselineNode;
+				}
+			}
+		}
+	}
+
+	return BaselineNodes;
+}
+
 ////----------------------------------------------------------------------------------------
 //// Write a csv file giving elevation and distance information for each pixel in each terrace.
 //// FJC 28/09/17
@@ -560,7 +603,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
  }
  cout << "Opened the csv" << endl;
 
-	output_file << "TerraceID,Latitude,Longitude,X,Y,Elevation,DistAlongBaseline,DistToBaseline,ChannelRelief" << endl;
+	output_file << "TerraceID,Latitude,Longitude,X,Y,Elevation,DistAlongBaseline,DistToBaseline,BaselineNode,ChannelRelief" << endl;
 
 	LSDIndexRaster ConnectedComponents(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,ConnectedComponents_Array,GeoReferencingStrings);
 
@@ -571,6 +614,7 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 	Array2D<float> ElevationArray = ElevationRaster.get_RasterData();
 	Array2D<float> ReliefArray = ChannelRelief.get_RasterData();
 	Array2D<float> DistToBaseline = Swath.get_DistanceToBaseline_ConnectedComponents(ConnectedComponents);
+	Array2D<int> ChannelNodes = get_ChannelNodeArray(Swath, BaselineDistance, FlowInfo);
 
 	cout << "Now writing the terrace information to the csv file..." << endl;
 
@@ -592,12 +636,51 @@ void LSDTerrace::print_TerraceInfo_to_csv(string csv_filename, LSDRaster& Elevat
 				ElevationRaster.get_x_and_y_locations(row, col, x_loc, y_loc);
 				//cout << "Row: " << row << " Col: " << col << " X: " << x_loc << " Y: " << y_loc << endl;
 				ElevationRaster.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+
 				float this_elev = ElevationRaster.get_data_element(row,col);
-				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << x_loc << "," << y_loc << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ReliefArray[row][col] << endl;
+
+				output_file << ConnectedComponents_Array[row][col] << "," << latitude << "," << longitude << "," << x_loc << "," << y_loc << "," << this_elev << "," << BaselineDistance[row][col] << "," << DistToBaseline[row][col] << "," << ChannelNodes[row][col] << "," << ReliefArray[row][col] << endl;
 			}
 		}
 	}
 	output_file.close();
+}
+//-----------------------------------------------------------------------//
+// function to print terrace widths to csv
+// FJC 21/11/17
+//-----------------------------------------------------------------------//
+
+void LSDTerrace::print_TerraceWidths_to_csv(string csv_filename, LSDSwath& Swath)
+{
+	// get the cc to index raster
+	LSDIndexRaster ConnectedComponents = print_ConnectedComponents_to_Raster();
+
+	// now get the terrace widths
+	vector<float> Widths = Swath.get_widths_along_swath(ConnectedComponents);
+
+	vector<float> DistAlongBaseline = Swath.get_DistanceAlongBaseline();
+
+	// open the csv
+	ofstream output_file;
+	output_file.open(csv_filename.c_str());
+  output_file.precision(8);
+
+	if (!output_file)
+	{
+	  cout << "\n Error opening output csv file. Please check your filename";
+	  exit(1);
+	}
+  cout << "Opened the csv" << endl;
+
+	// write to file
+	output_file << "DistAlongBaseline,TerraceWidth" << endl;
+
+	for (int i = 0; i < int(DistAlongBaseline.size()); i++)
+	{
+		output_file << DistAlongBaseline[i] << "," << Widths[i] << endl;
+	}
+	output_file.close();
+
 }
 
 #endif

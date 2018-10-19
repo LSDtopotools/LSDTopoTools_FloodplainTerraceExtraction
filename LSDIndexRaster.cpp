@@ -1492,11 +1492,11 @@ LSDIndexRaster LSDIndexRaster::clip_to_smaller_raster(LSDRaster& smaller_raster)
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// THis copy the Nodata region from another raster WITH THE SAME DIMENSION AND RESOLUTION. 
+// THis copy the Nodata region from another raster WITH THE SAME DIMENSION AND RESOLUTION.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDIndexRaster::NoData_from_another_raster(LSDRaster& other_raster)
 {
-  
+
 
   //Array2D<int> NewData(NRows,NCols, NoDataValue);
   //Array2D<float> other_raster_data = other_raster.get_RasterData();

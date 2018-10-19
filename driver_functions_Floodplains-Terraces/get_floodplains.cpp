@@ -81,7 +81,6 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
-	bool_default_map["write hillshade"] = false;
 
 	// Use the parameter parser to get the maps of the parameters required for the
 	// analysis
@@ -143,17 +142,6 @@ int main (int nNumberofArgs,char *argv[])
     filled_topo_test = load_DEM;
   }
 
-	// check to see if you need hillshade
-	if (this_bool_map["write hillshade"])
-	{
-		float hs_azimuth = 315;
-		float hs_altitude = 45;
-		float hs_z_factor = 1;
-		LSDRaster hs_raster = filled_topo_test.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
-
-		string hs_fname = DATA_DIR+DEM_ID+"_hs";
-		hs_raster.write_raster(hs_fname,DEM_extension);
-	}
 
   cout << "\t Flow routing..." << endl;
 	// get a flow info object

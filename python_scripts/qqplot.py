@@ -100,13 +100,13 @@ def make_q_q_plots(snv1,values1,mn_values1,snv2,values2,mn_values2):
 
 if __name__ == "__main__":
 
-    DataDirectory="/home/clubb/rahul/"
+    DataDirectory="/home/clubb/christie/"
 
     if not DataDirectory.endswith("/"):
         print("You forgot the '/' at the end of the directory, appending...")
         DataDirectory = DataDirectory+"/"
 
-    DEM_name = '3'
+    DEM_name = 'oregon_dem'
     relief_file=DataDirectory+DEM_name+"_qq_relief.txt"
     slope_file=DataDirectory+DEM_name+"_qq_slope.txt"
     OutputName = DataDirectory+DEM_name+"_qq_plots"

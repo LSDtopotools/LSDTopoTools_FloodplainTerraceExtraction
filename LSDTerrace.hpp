@@ -81,6 +81,21 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @date 26/10/16
 	void get_terraces_along_main_stem(int junction_number, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& DistFromOutlet);
 
+  /// @brief This function prints terrace widths along the swath to csv
+	/// @param csv_filename name of csv
+  /// @param Swath swath object
+	/// @author FJC
+	/// @date 21/11/17
+  void print_TerraceWidths_to_csv(string csv_filename, LSDSwath& Swath);
+
+  /// @brief This function gets the nearest channel node on the baseline to each terrace pixel
+  /// @param Swath LSDSwath object
+  /// @param BaselineDistance array of distance along baseline of each channel
+  /// @param FlowInfo LSDFlowInfo object
+  /// @author FJC
+  /// @date 30/11/17
+  Array2D<int> get_ChannelNodeArray(LSDSwath& Swath, Array2D<float> BaselineDistance, LSDFlowInfo& FlowInfo);
+
 	/// FUNCTIONS TO GENERATE RASTERS
 
 	/// @brief This function prints the connected components array to a raster

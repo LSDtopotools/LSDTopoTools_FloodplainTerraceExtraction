@@ -88,6 +88,13 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
+	bool_default_map["print_stream_order_raster"] = false;
+	bool_default_map["print_junction_index_raster"] = false;
+	bool_default_map["print_junctions_to_csv"] = false;
+	bool_default_map["convert_csv_to_geojson"] = false;
+	bool_default_map["snap_mchi_to_baseline"] = false;
+	bool_default_map["print_channels_to_csv"] = false;
+	bool_default_map["print_stream_order_raster"] = false;
 
 	// set default string parameters
 	string_default_map["coords_csv_file"] = "NULL";
@@ -146,9 +153,10 @@ int main (int nNumberofArgs,char *argv[])
 	}
 	else
 	{
-		//don't do the filtering, just load the filled DEM
-		LSDRaster load_DEM((DATA_DIR+DEM_ID+"_filtered"), DEM_extension);
+		//don't do the filtering, just load and fill the DEM
+		LSDRaster load_DEM((DATA_DIR+DEM_ID), DEM_extension);
 		RasterTemplate = load_DEM;
+		RasterTemplate = RasterTemplate.fill(this_float_map["Min slope filling"]);
 	}
 
 	cout << "\t Flow routing..." << endl;
@@ -157,25 +165,64 @@ int main (int nNumberofArgs,char *argv[])
 	// calcualte the distance from outlet
 	LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
-	// some error checking
-	vector<int> sources;
-	if (CHeads_file == "NULL")
-	{
-		cout << "I can't find your channel heads file so I'm going to use an area threshold to extract the sources" << endl;
-		LSDIndexRaster ContributingPixels = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
-		sources = FlowInfo.get_sources_index_threshold(ContributingPixels, this_int_map["Chan_area_threshold"]);
-	}
-	else
-	{
-		cout << "\t Loading the sources" << endl;
-		// load the sources
-		vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv", 2);
-		cout << "\t Got sources!" << endl;
-	}
+	// calculate the flow accumulation
+	cout << "\t Calculating flow accumulation (in pixels)..." << endl;
+	LSDIndexRaster FlowAcc = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+	int threshold_contributing_pixels = this_int_map["Chan area threshold"];
 
-	// now get the junction network
-	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
-  cout << "\t Got the channel network" << endl;
+	// some error checking
+	// load the sources
+  vector<int> sources;
+  if (CHeads_file == "NULL" || CHeads_file == "Null" || CHeads_file == "null")
+  {
+    cout << endl << endl << endl << "==================================" << endl;
+    cout << "The channel head file is null. " << endl;
+    cout << "Getting sources from a threshold of "<< threshold_contributing_pixels << " pixels." <<endl;
+    sources = FlowInfo.get_sources_index_threshold(FlowAcc, threshold_contributing_pixels);
+
+    cout << "The number of sources is: " << sources.size() << endl;
+  }
+	else
+  {
+    cout << "Loading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
+    sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
+    cout << "\t Got sources!" << endl;
+  }
+
+  // now get the junction network
+  LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
+
+  // Print channels and junctions if you want them.
+  if( this_bool_map["print_channels_to_csv"])
+  {
+    cout << "I am going to print the channel network." << endl;
+    string channel_csv_name = DATA_DIR+DEM_ID+"_CN";
+    ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+
+    // convert to geojson if that is what the user wants
+    // It is read more easily by GIS software but has bigger file size
+    if ( this_bool_map["convert_csv_to_geojson"])
+    {
+      string gjson_name = DATA_DIR+DEM_ID+"_CN.geojson";
+      LSDSpatialCSVReader thiscsv(DATA_DIR+DEM_ID+"_CN.csv");
+      thiscsv.print_data_to_geojson(gjson_name);
+    }
+  }
+
+  // print junctions
+  if( this_bool_map["print_junctions_to_csv"])
+  {
+    cout << "I am writing the junctions to csv." << endl;
+    string channel_csv_name = DATA_DIR+DEM_ID+"_JN.csv";
+    ChanNetwork.print_junctions_to_csv(FlowInfo, channel_csv_name);
+
+    if ( this_bool_map["convert_csv_to_geojson"])
+    {
+      string gjson_name = DATA_DIR+DEM_ID+"_JN.geojson";
+      LSDSpatialCSVReader thiscsv(channel_csv_name);
+      thiscsv.print_data_to_geojson(gjson_name);
+    }
+  }
 
 	// read in the upstream and downstream latitude and longitude coordinates
 	if (this_string_map["coords_csv_file"] != "NULL")
@@ -203,9 +250,11 @@ int main (int nNumberofArgs,char *argv[])
 			// get the channel between these points
 			cout << "Got channel nodes: " << snapped_nodes[0] << ", " << snapped_nodes[1] << endl;
 			LSDIndexChannel BaselineChannel(snapped_nodes[0], snapped_nodes[1], FlowInfo);
+			// print for bug checking
+			BaselineChannel.write_channel_to_csv(DATA_DIR, DEM_ID, FlowInfo, DistanceFromOutlet, RasterTemplate);
 			vector<double> X_coords;
 			vector<double> Y_coords;
-			BaselineChannel.get_coordinates_of_channel_nodes(X_coords, Y_coords);
+			BaselineChannel.get_coordinates_of_channel_nodes(X_coords, Y_coords, FlowInfo);
 
 			// get the point data from the BaselineChannel
 			PointData BaselinePoints = get_point_data_from_coordinates(X_coords, Y_coords);
@@ -259,6 +308,10 @@ int main (int nNumberofArgs,char *argv[])
 			Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, SwathRaster, FlowInfo, TestSwath);
 			//(string csv_filename, LSDRaster& ElevationRaster, LSDRaster& ChannelRelief,  LSDFlowInfo& FlowInfo, LSDSwath& Swath)
 
+			// print the information about the baseline channel to csv
+			string channel_csv_fname = "_baseline_channel_info.csv";
+			cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
+			TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname, FlowInfo, DistanceFromOutlet);
 
 			// write raster of terrace elevations
 			LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
@@ -309,14 +362,17 @@ int main (int nNumberofArgs,char *argv[])
 			// get the channel between the outlet and the upstream junction
 			int downstream_node = ChanNetwork.get_Node_of_Junction(JunctionsList[i]);
 			LSDIndexChannel BaselineChannel(SourcesList[i], downstream_node, FlowInfo);
-			vector<double> X_coords;
-			vector<double> Y_coords;
-			BaselineChannel.get_coordinates_of_channel_nodes(X_coords, Y_coords);
 
 			// get the junction number as a string for labelling outputs
 			string jn_name = itoa(JunctionsList[i]);
 			string uscore = "_";
 			jn_name = uscore+jn_name;
+
+			// print channel for bug checking
+			BaselineChannel.write_channel_to_csv(DATA_DIR, DEM_ID+jn_name, FlowInfo, DistanceFromOutlet, RasterTemplate);
+			vector<double> X_coords;
+			vector<double> Y_coords;
+			BaselineChannel.get_coordinates_of_channel_nodes(X_coords, Y_coords, FlowInfo);
 
 			// get the point data from the BaselineChannel
 			PointData BaselinePoints = get_point_data_from_coordinates(X_coords, Y_coords);
@@ -327,7 +383,7 @@ int main (int nNumberofArgs,char *argv[])
 			cout << "\n\t Getting raster from swath" << endl;
 			LSDRaster SwathRaster = TestSwath.get_raster_from_swath_profile(RasterTemplate, this_int_map["NormaliseToBaseline"]);
 			string swath_ext = "_swath_raster";
-			SwathRaster.write_raster((DATA_DIR+DEM_ID+swath_ext), DEM_extension);
+			SwathRaster.write_raster((DATA_DIR+DEM_ID+jn_name+swath_ext), DEM_extension);
 
 			// get the slope
 			cout << "\t Getting the slope" << endl;
@@ -365,10 +421,15 @@ int main (int nNumberofArgs,char *argv[])
 
 			// print the terrace information to a csv
 			string csv_fname = "_terrace_info";
-			string full_csv_name = DATA_DIR+DEM_ID+jn_name+".csv";
+			string full_csv_name = DATA_DIR+DEM_ID+jn_name+csv_fname+".csv";
 			cout << "The full csv filename is: " << full_csv_name << endl;
 			Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, SwathRaster, FlowInfo, TestSwath);
-			//(string csv_filename, LSDRaster& ElevationRaster, LSDRaster& ChannelRelief,  LSDFlowInfo& FlowInfo, LSDSwath& Swath)
+			//(string csv_filename, LSDRaster& ElevationRaster, LSDRast
+
+			//print the information about the baseline channel to csv
+			string channel_csv_fname = "_baseline_channel_info.csv";
+			cout << "The channel csv filename is" << DATA_DIR+DEM_ID+jn_name+channel_csv_fname << endl;
+			TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+jn_name+channel_csv_fname, FlowInfo, DistanceFromOutlet);
 
 			// write raster of terrace elevations
 			LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);

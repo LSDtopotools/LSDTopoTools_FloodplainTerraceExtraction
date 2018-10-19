@@ -478,6 +478,27 @@ class LSDCosmoData
                                       string muon_scaling);
 
 
+
+    /// @brief This function calculates the concentration of a CRN
+    ///  (either 10Be or 26Al) given an erosion rate supplied by and 
+    ///  erosion rate raster (in g/cm^2/yr)
+    /// @param Raster_names a vector of strings with 4 elements:
+    ///  [0] = DEM_filename
+    ///  [1] = Snow_shield_raster_name OR const_snow_shield in g/cm^2
+    ///  [2] = Self_shield_raster_name OR const_self_shield in g/cm^2
+    ///  [3] = Toposhield_raster_name 
+    ///  It there is no DEM then this is set to "NULL"
+    ///  @param CRN_params this contains the single shielding depths for snow
+    ///   and self shielding if the rasters are not supplied. 
+    /// @param known_eff_erosion an LSDRaster with known erosion rates in g/cm^2/yr
+    /// @author SMM
+    /// @date 14/06/2016
+    void full_shielding_CRN_concentration_predictor(vector<string> Raster_names,
+                            vector<double> CRN_params, 
+                            LSDRaster& known_eff_erosion);
+
+
+
     /// @brief this function prints the data held in the the data members
     ///  to screen. Is used for bug checking. 
     /// @detail Note the function does not print the standardised values, only raw values.

@@ -462,6 +462,7 @@ class LSDRaster
   /// @author SMM
   /// @date 22/01/2016
   void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
+  void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
 
 
   /// @brief This function returns a vector with the X adn Y minimum and max
@@ -579,6 +580,10 @@ class LSDRaster
   /// @author FJC
   /// @date 10/02/17
   LSDRaster BufferRasterData(float window_radius);
+
+  /// @brief Pad one smaller raster to the same extent as a bigger raster by adding
+  /// no data around the edges
+  LSDIndexRaster PadSmallerRaster(LSDIndexRaster& smaller_raster);
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -864,6 +869,39 @@ class LSDRaster
   /// @author DTM
   /// @date 28/03/2014
   vector<LSDRaster> calculate_polyfit_surface_metrics(float window_radius, vector<int> raster_selection);
+
+  /// @brief Surface polynomial fitting and extraction of topographic metrics.
+  ///  Same as above function but in this case one can opt for directional gradients.
+  ///  Added as another function to ensure legacy code is not broken.
+  /// @detail A six term polynomial surface is fitted to all the points that lie
+  /// within circular neighbourhood that is defined by the designated window
+  /// radius.  The user also inputs a binary raster, which tells the program
+  /// which rasters it wants to create (label as "1" to produce them, "0" to
+  /// ignore them. This has 8 elements, as listed below:
+  ///        0 -> Elevation (smoothed by surface fitting)
+  ///        1 -> Slope
+  ///        2 -> Aspect
+  ///        3 -> Curvature
+  ///        4 -> Planform Curvature
+  ///        5 -> Profile Curvature
+  ///        6 -> Tangential Curvature
+  ///        7 -> Stationary point classification (1=peak, 2=depression, 3=saddle)
+  ///        8 -> Directional gradients (dz/dx and dz,dy)
+  /// The program returns a vector of LSDRasters.  For options marked "false" in
+  /// boolean input raster, the returned LSDRaster houses a blank raster, as this
+  /// metric has not been calculated.  The desired LSDRaster can be retrieved from
+  /// the output vector by using the cell reference shown in the list above i.e. it
+  /// is the same as the reference in the input boolean vector.
+  /// @param window_radius -> the radius of the circular window over which to
+  /// fit the surface
+  /// @param raster_selection -> a binary raster, with 8 elements, which
+  /// identifies which metrics you want to calculate.
+  /// @return A vector of LSDRaster objects.  Those that you have not asked to
+  /// be calculated are returned as a 1x1 Raster housing a NoDataValue
+  ///
+  /// @author SMM
+  /// @date 22/06/2018
+  vector<LSDRaster> calculate_polyfit_surface_metrics_directional_gradients(float window_radius, vector<int> raster_selection);
 
   /// @brief Surface polynomial fitting and extraction of roughness metrics
   ///
