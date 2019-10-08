@@ -1399,7 +1399,7 @@ LSDRaster LSDBasin::write_real_data_to_LSDRaster(float Param, LSDFlowInfo FlowIn
 // Cookie cut data from an LSDRaster into the shape of the basin.
 // SWDG 12/12/13
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-LSDRaster LSDBasin::write_raster_data_to_LSDRaster(LSDRaster Data, LSDFlowInfo FlowInfo)
+LSDRaster LSDBasin::write_raster_data_to_LSDRaster(LSDRaster& Data, LSDFlowInfo& FlowInfo)
 {
 
   int i;
@@ -4226,7 +4226,7 @@ double LSDCosmoBasin::predict_CRN_erosion_nested(double Nuclide_conc, string Nuc
 
   // now check if there are unknown erosion rates in basin
   bool there_are_unknowns = are_there_unknown_erosion_rates_in_basin(eff_erosion_raster,FlowInfo);
-  if (not there_are_unknowns)
+  if ( there_are_unknowns == false)
   {
     cout << "There are no unknown erosion rates in this basin." << endl;
     cout << " Taking the average of the known erosion rates." << endl;
@@ -5640,7 +5640,7 @@ vector<double> LSDCosmoBasin::calculate_effective_pressures_for_calculators_nest
 {
 
   // make sure the rasters are the same size
-  if ( not Elevation.does_raster_have_same_dimensions(known_eff_erosion_rates))
+  if ( Elevation.does_raster_have_same_dimensions(known_eff_erosion_rates) == false)
   {
     cout << "LSDCosmoBasin::calculate_effective_pressures_for_calculators_nested ERROR!" << endl;
     cout << "The erosion raster and DEM are not the same dimesions." <<endl;

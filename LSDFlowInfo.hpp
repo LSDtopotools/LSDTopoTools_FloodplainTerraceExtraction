@@ -87,6 +87,15 @@ using namespace std;
 using namespace TNT;
 
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
+
+
 /// @brief Object to perform flow routing.
 class LSDFlowInfo
 {
@@ -184,6 +193,19 @@ class LSDFlowInfo
   void  get_lat_and_long_locations(double X, double Y, double& lat,
                    double& longitude, LSDCoordinateConverterLLandUTM Converter);
 
+  /// @brief a function to get the northing and easting provided as lat and long
+  /// @detail Assumes WGS84 ellipsiod
+  /// @param lat the latitude of the node (in decimal degrees, replaced by function)
+  ///  Note: this is a double, because a float does not have sufficient precision
+  ///  relative to a UTM location (which is in metres)
+  /// @param long the longitude of the node (in decimal degrees, replaced by function)
+  ///  Note: this is a double, because a float does not have sufficient precision 
+  /// @param X the Easting of the location
+  /// @param Y the Northing of the location
+  /// @author SMM
+  /// @date 30/09/2019
+  void get_x_and_y_from_latlong(double lat, double longitude, double& X, double& Y );
+
   /// @brief this check to see if a point is within the raster
   /// @param X_coordinate the x location of the point
   /// @param Y_coordinate the y location of the point
@@ -267,6 +289,32 @@ class LSDFlowInfo
   /// @date 20/05/16
   void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int>& nodeindex_vec, string outfilename);
 
+
+  /// @brief This function takes a vector of node indices and prints a csv
+  ///  file that can be read by arcmap: similar to above but also prints lat and long
+  /// @detail Adds an option for a path
+  /// @param nodeindex vec is a vector of nodeindices (which are ints)
+  /// @param path to the outfile
+  /// @param outfilename is a string of the filename
+  /// @author SMM
+  /// @date 20/05/16
+  void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename);
+
+
+  /// @brief This function takes a vector of node indices and prints a csv
+  ///  file that can be read by arcmap: similar to above but also prints lat and long
+  /// @detail Adds an option for a path
+  /// @param nodeindex vec is a vector of nodeindices (which are ints)
+  /// @param path to the outfile
+  /// @param outfilename is a string of the filename
+  /// @param Elevation an elevation raster
+  /// @param FlowDistance
+  /// @param drainage_area
+  /// @author SMM
+  /// @date 30/09/19
+  void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename, LSDRaster& Elevation, LSDRaster& FlowDistance, 
+                                                            LSDRaster& drainage_area);
+
   ///@brief This function takes a vector of node indices and prints a csv
   ///file that can be read by arcmap, adding in a unique id to each row, independent of the nodeindex.
   ///
@@ -276,6 +324,7 @@ class LSDFlowInfo
   ///@author SWDG after SMM
   ///@date 2/2/16
   void print_vector_of_nodeindices_to_csv_file_Unique(vector<int>& nodeindex_vec, string outfilename);
+
 
   ///@brief Get the number of pixels flowing into a node.
   ///@param node Integer of node index value.
@@ -493,7 +542,9 @@ class LSDFlowInfo
   /// @details Assumes the FlowInfo object has the same dimensions as the channel heads raster.
   /// @param filename of the channel heads raster.
   /// @param extension of the channel heads raster.
-  /// @param (optional) input_switch, ONLY NEEDED FOR LOADING .csv FILES! An integer to determine whether to use the node index (0 -> default), row and column indices (1), or point coordinates from .csv file (2) to locate the channel heads
+  /// @param (optional) input_switch, ONLY NEEDED FOR LOADING .csv FILES! 
+  ///  An integer to determine whether to use the node index (0 -> default), row and column indices (1), 
+  ///  or point coordinates from .csv file (2) to locate the channel heads
   /// @return Vector of source nodes.
   /// @author SWDG updated SMM updated DTM
   /// @date 6/6/14 Happy 3rd birthday Skye!!
@@ -509,7 +560,9 @@ class LSDFlowInfo
   /// @details Assumes the FlowInfo object has the same dimensions as the channel heads raster.
   /// @param filename of the channel heads raster.
   /// @param extension of the channel heads raster.
-  /// @param (optional) input_switch, ONLY NEEDED FOR LOADING .csv FILES! An integer to determine whether to use the node index (0 -> default), row and column indices (1), or point coordinates from .csv file (2) to locate the channel heads
+  /// @param (optional) input_switch, ONLY NEEDED FOR LOADING .csv FILES! 
+  ///   An integer to determine whether to use the node index (0 -> default),
+  ///   row and column indices (1), or point coordinates from .csv file (2) to locate the channel heads
   /// @return Vector of source nodes.
   /// @author SWDG updated SMM updated DTM
   /// @date 6/6/14 Happy 3rd birthday Skye!!
@@ -522,6 +575,13 @@ class LSDFlowInfo
   /// @author FJC
   /// @date 28/11/16
   vector<int> Ingest_Channel_Heads_OS(string csv_filename);
+
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // Minimalistic method to ingest the channel heads from vectors of x y coordinates
+  // Using xy allows a "universal" method that can ingest external or internal data
+  // B.G. 11/11/2018
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  vector<int> Ingest_Channel_Heads(vector<float>& x_coord, vector<float>& y_coord);          
 
   // functions for getting flow, discharge, sediment flux, etc
 
@@ -553,6 +613,24 @@ class LSDFlowInfo
   /// @date 18/12/2016
   int retrieve_base_level_node(int node);
 
+  /// @brief This creates a new raster that has any nodes influenced by the edge removed
+  /// @detail uses D8 flow routing to do this
+  /// @param topography A topography raster (must be same dimension as that used to make flowinfo)
+  /// @author SMM
+  /// @date 08/10/2019
+  LSDRaster remove_nodes_influneced_by_edge(LSDRaster& topography);
+
+  /// @brief This creates a new raster. It takes a node list (usually a channel) and then
+  ///  looks at all the donors to that channel and sees if any are influenced upslope
+  ///  by nodata. It then removes all these pixels. This way you can isolate both
+  ///  nodes drainaing to a local base level but eliminate nodes draining from the edge. 
+  /// @detail uses D8 flow routing to do this
+  /// @param topography A topography raster (must be same dimension as that used to make flowinfo)
+  /// @param node_list a list of nodes (often read by an LSDSpatialCSVReader object)
+  /// @author SMM
+  /// @date 08/10/2019
+  LSDRaster find_nodes_not_influenced_by_edge_draining_to_nodelist(vector<int> node_list,LSDRaster& topography);
+
   ///@brief This function returns an integer vector containing all the node
   ///indexes upslope of of the node with number node_number_outlet.
   ///@param node_number_outlet Integer of the target node.
@@ -560,6 +638,14 @@ class LSDFlowInfo
   /// @author SMM
   /// @date 01/016/12
   vector<int> get_upslope_nodes(int node_number_outlet);
+
+  ///@brief This function returns an integer vector containing all the node
+  ///indexes upslope of of the node with number node_number_outlet, and then includes the outlet
+  ///@param node_number_outlet Integer of the target node.
+  ///@return Integer vector of upslope node indexes plus outlet node index.
+  /// @author SMM
+  /// @date 30/07/19
+  vector<int> get_upslope_nodes_include_outlet(int node_number_outlet);
 
   /// @brief This function takes a list of sources and then creates a raster
   ///  with nodata values where points are not upslope of the sources
@@ -588,6 +674,17 @@ class LSDFlowInfo
   ///@author SMM
   ///@date 09/06/2014
   LSDRaster upslope_variable_accumulator(LSDRaster& accum_raster);
+
+  ///@brief This function accumulates some variable from an LSDRaster
+  ///The most probably use is to accumulate precipitation in order
+  ///to get a discharge raster
+  ///@param A raster that contains the variable to be accumulated (e.g., precipitation)
+  ///@param bool Determinde if the current node is accumulated to itself or not. Default to yes.
+  ///@return A raster containing the accumulated variable
+  ///@author BG, SMM
+  ///@date 17/04/2019
+  LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster);
+  LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster, bool accum_current_node);
 
   ///@brief This function tests whether one node is upstream of another node
   ///@param current_node
@@ -925,6 +1022,16 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   void D8_Trace(int i, int j, LSDIndexRaster StreamNetwork, float& length,
                    int& receiver_row, int& receiver_col, Array2D<int>& Path);
 
+  /// @brief Perform a downslope trace using D8 from a given point source.
+  /// @details This version uses lat-long
+  /// @param latitude The latitude of the source.
+  /// @param longitude The longitude of the source
+  /// @return A vector of nodeindices that contain the nodes from start to finish that are 
+  ///  on the flow path
+  /// @author SMM
+  /// @date 30/09/2019
+  vector<int> get_flow_path(float latitude, float longitude);                   
+
   /// @brief Move the location of the channel head downslope by a user defined distance.
   /// @param Sources a vector of node indexes of the channel heads to be moved.
   /// @param MoveDist The distance in spatial units the head is to be moved.
@@ -1246,6 +1353,21 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// @date 23/1/17
   void snap_to_hilltops(vector<float> x_locs, vector<float> y_locs, int search_radius, LSDRaster& Hilltops, vector<int>& SnappedNodes, vector<int>& Valid_node_IDs);
 
+  /// @brief Extract distinct vector of flows for the entire landscape.
+  /// @return Avector of vector of node index
+  /// @author BG
+  /// @date 29/10/2018
+  vector<vector<int> > get_vectors_of_flow(LSDRaster& topo);
+
+  /// Accessor for the DonorStackVector()
+  vector<int> get_DonorStackVector() {return DonorStackVector;}  
+  /// Accessor for the DonorStackVector()
+  vector<int> get_RowIndex() {return RowIndex;}  
+  /// Accessor for the DonorStackVector()
+  vector<int> get_ColIndex() {return ColIndex;}  
+
+  map<string, vector< vector<int> > > get_map_of_vectors();
+
   protected:
 
   ///Number of rows.
@@ -1343,6 +1465,9 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// The strings can be any length, as long as the first letter corresponds to the
   /// first letter of the boundary condition. It is not case sensitive.
   vector<string> BoundaryConditions;
+
+  /// @brief map of donorless nodes. Key is node index, val is pair of row,col.
+  map<int, pair<int,int> > No_Donor_Map;
 
   private:
     void create();

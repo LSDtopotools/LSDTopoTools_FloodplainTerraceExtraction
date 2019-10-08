@@ -36,29 +36,30 @@ int main (int nNumberofArgs,char *argv[])
 	//start the clock
 	clock_t begin = clock();
 
-	//Test for correct input arguments
-	if (nNumberofArgs!=3)
-	{
-    cout << "=========================================================" << endl;
-    cout << "|| Welcome to the LSDTopoTools floodplain extraction!  ||" << endl;
-    cout << "|| This program extracts floodplains using slope and	  ||" << endl;
-		cout << "|| relief thresholds. This program was developed by    ||" << endl;
-    cout << "|| Fiona J. Clubb												              ||" << endl;
-    cout << "|| at the University of Edinburgh                      ||" << endl;
-    cout << "=========================================================" << endl;
-    cout << "This program requires two inputs: " << endl;
-    cout << "* First the path to the parameter file." << endl;
-    cout << "* Second the name of the param file (see below)." << endl;
-    cout << "---------------------------------------------------------" << endl;
-    cout << "Then the command line argument will be, for example: " << endl;
-    cout << "In linux:" << endl;
-    cout << "./get_floodplains.out /LSDTopoTools/Topographic_projects/Test_data/ LSDTT_floodplains.param" << endl;
-    cout << "=========================================================" << endl;
-    exit(EXIT_SUCCESS);
-	}
 
-	string path_name = argv[1];
-	string f_name = argv[2];
+  cout << "=========================================================" << endl;
+  cout << "|| Welcome to the LSDTopoTools floodplain extraction!  ||" << endl;
+  cout << "|| This program extracts floodplains using slope and	  ||" << endl;
+  cout << "|| relief thresholds. This program was developed by    ||" << endl;
+  cout << "|| This program was developed by                       ||" << endl;
+  cout << "|| Fiona J. Clubb												              ||" << endl;
+  cout << "|| with minor housekeeping from Simon M Mudd						||" << endl;
+  cout << "||  at the University of Edinburgh                     ||" << endl;
+  cout << "=========================================================" << endl;   
+  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "|| https://www.doi.org/10.5281/zenodo.824204           ||" << endl;
+  cout << "|| And                                                 ||" << endl;   
+  cout << "|| https://www.earth-surf-dynam.net/5/369/2017/        ||" << endl;  
+  cout << "=========================================================" << endl;
+  cout << "|| Documentation can be found at:                      ||" << endl;
+  cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
+  cout << "=========================================================" << endl;
+
+  // Get the arguments
+  vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
+
+  string path_name = path_and_file[0];
+  string f_name = path_and_file[1];
 
 	// maps for setting default parameters
 	map<string,int> int_default_map;

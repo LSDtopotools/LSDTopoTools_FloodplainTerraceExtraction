@@ -110,6 +110,13 @@ Tools are included to:
 #include "LSDShapeTools.hpp"
 using namespace std;
 using namespace TNT;
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 ///@brief Main analysis object to interface with other LSD objects.
 class LSDRaster
@@ -170,9 +177,14 @@ class LSDRaster
       float cellsize, float ndv, Array2D<float> data, map<string,string> temp_GRS)
   { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, temp_GRS); }
 
+  /// @brief Create an LSDRaster from an LSDIndexRaster object
+  /// @return LSDRaster
+  /// @param IntLSDRaster an LSDIndexRaster object
+  /// @author SMM
+  /// @date 30/07/19
+  LSDRaster(LSDIndexRaster& IntLSDRaster)   { create(IntLSDRaster); }
 
   // Get functions
-
   /// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
   /// @return Number of columns as an integer.
@@ -187,6 +199,9 @@ class LSDRaster
   int get_NoDataValue() const      { return NoDataValue; }
   /// @return Raster values as a 2D Array.
   Array2D<float> get_RasterData() const { return RasterData.copy(); }
+
+  Array2D<float>* get_RasterDataPtr() { return &RasterData; }
+
 
   /// @brief Get the raw raster data, double format
   /// @author DAV
@@ -214,6 +229,13 @@ class LSDRaster
   /// @author SMM
   /// @date 19/05/16
   void set_data_element(int row, int column, float value)  { RasterData[row][column] = value; }
+
+  /// @brief Sets the raster global data.
+  /// @param 2Darray new array of data. Needs to be same dimensions than the other one.
+  /// @author BG
+  /// @date 16/04/19
+  void set_data_array(Array2D<float> ndata)  { RasterData = ndata.copy(); }
+
 
   /// Assignment operator.
   LSDRaster& operator=(const LSDRaster& LSDR);
@@ -1900,6 +1922,14 @@ class LSDRaster
   /// @date 16/10/13
   LSDRaster D_inf_units();
 
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  ///@brief Wrapper Function to create a D-infinity flow accumulation and drainage area raster
+  ///@return vector of LSDRaster (0 is acc, 1 is DA)
+  ///@author BG 
+  ///@date 09/01/2018
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  vector<LSDRaster> D_inf_flowacc_DA();
+
   ///@brief Wrapper Function to convert a D-infinity flow raster into spatial units.
   /// @return LSDRaster of D-inf flow areas in spatial units.
   /// @author MDH (after SWDG)
@@ -2353,6 +2383,15 @@ class LSDRaster
   /// @date 18/10/17
   LSDRaster convert_from_centimetres_to_metres();
 
+
+  /// @brief EXPERIMENTAL: Implementation of RichDEM breaching algorithm
+  /// @Brief originally from Lindsay et al., 2016 DOI: DOI:https://doi.org/10.1002/hyp.10648
+  /// @return LSDRaster carved
+  /// @author BG
+  /// @date 31/10/2018 (spooky!)
+  LSDRaster Breaching_Lindsay2016();
+
+
 protected:
 
   ///Number of rows.
@@ -2390,6 +2429,7 @@ protected:
               double cellsize, int ndv, Array2D<double> data);
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data, map<string,string> GRS);
+  void create(LSDIndexRaster& IntLSDRaster);
 
 };
 

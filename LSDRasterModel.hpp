@@ -101,10 +101,10 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param data An Array2D of floats in the shape nrows*ncols,
   ///containing the data to be written.
   LSDRasterModel(int nrows, int ncols, float xmin, float ymin,
-            float cellsize, float ndv, Array2D<float> data)
+            float cellsize, float ndv, Array2D<float> data, map<string,string> GRS)
   {
     default_parameters();
-    create(nrows, ncols, xmin, ymin, cellsize, ndv, data);
+    create(nrows, ncols, xmin, ymin, cellsize, ndv, data, GRS);
   }
 
   /// @brief Constructor. Create an LSDRasterModel from an LSDRaster.
@@ -686,6 +686,34 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 29/08/2017
   float fluvial_calculate_K_for_steady_state_relief(float U, float desired_relief);
 
+  /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+  ///  It also allows fixed base level. 
+  /// @param K_values a raster of erodiblity
+  /// @param U_values a raster of uplift
+  /// @param Fixed_points a raster of elevations that are fixed in the model
+  /// @author SMM
+  /// @date 01/10/2019
+  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, LSDRaster& Fixed_points);
+
+  /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+  ///  It also allows fixed base level. 
+  /// @detail In this version the base level is read from a csv file
+  /// @param K_values a raster of erodiblity
+  /// @param U_values a raster of uplift
+  /// @param csv_points_file the full path to a fiel with the elevation and node index data
+  /// @author SMM
+  /// @date 03/10/2019
+  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, string csv_of_fixed_channel);
+
+  /// @brief This method instantaneously tilts the landscape by a certain angle.
+  /// @param angle the tilt angle in degrees
+  /// @param tilt_boundary. Tilt can be from the N, E, S, or W boundary. Must be"N", "E",
+  /// "S", or "W".
+  /// @return Doesn't return anlything but updates the raster elevations
+  /// @author FJC
+  /// @date 11/03/19
+  void instantaneous_tilt(float angle, string tilt_boundary);
+
 
   /// @brief Fastscape, implicit finite difference solver for stream power equations
   /// O(n)
@@ -1150,6 +1178,12 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 09/08/2017
   void set_print_erosion( bool do_I_print_erosion )      { print_erosion = do_I_print_erosion; }
+
+  /// @brief Sets the End time mode
+  /// @param short 0,1,2,3,4
+  /// @author BG
+  /// @date 22/01/2019
+  void set_endTime_mode(short edm){endTime_mode = edm;}
 
 
 
@@ -1725,7 +1759,7 @@ class LSDRasterModel: public LSDRasterSpectral
   void create(string master_param);
   void create(string filename, string extension);
   void create(int ncols, int nrows, float xmin, float ymin,
-        float cellsize, float ndv, Array2D<float> data);
+        float cellsize, float ndv, Array2D<float> data, map<string,string>);
   void create(LSDRaster& An_LSDRaster);
   void default_parameters( void );
 
