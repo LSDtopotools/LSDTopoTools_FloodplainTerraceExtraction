@@ -40,8 +40,6 @@ int main (int nNumberofArgs,char *argv[])
     cout << "|| This program was developed by                       ||" << endl;
     cout << "|| Fiona J. Clubb												              ||" << endl;
     cout << "|| at the University of Edinburgh.                     ||" << endl;
-		cout << "|| Was then further developed at the University of     ||" << endl;
-		cout << "|| Minnesota, AMERICAN STYLE.         									||" << endl;
     cout << "=========================================================" << endl;
     cout << "This program requires two inputs: " << endl;
     cout << "* First the path to the parameter file." << endl;
@@ -88,6 +86,11 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default string parameters
 	string_default_map["input_shapefile"] = "NULL";
+
+	// parameters for using absolute thresholds if you want to
+	bool_default_map["use_absolute_thresholds"] = false;
+	int_default_map["Relief threshold"] = 50;
+	float_default_map["Slope threshold"] = 0.2;
 
 	// Use the parameter parser to get the maps of the parameters required for the
 	// analysis
@@ -203,34 +206,30 @@ int main (int nNumberofArgs,char *argv[])
 	LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
 
 	// get the channel relief and slope threshold using quantile-quantile plots
-	cout << "Getting channel relief threshold from QQ plots" << endl;
-	string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
-	float relief_threshold_from_qq = SwathRaster.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
+	float relief_threshold, slope_threshold;
+	if(this_bool_map["use_absolute_thresholds"])
+	{
+		relief_threshold = this_int_map["Relief threshold"];
+		slope_threshold = this_float_map["Slope threshold"];
+	}
+	else
+	{
+		cout << "Getting channel relief threshold from QQ plots" << endl;
+		string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
+		relief_threshold = SwathRaster.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
 
-	cout << "Getting slope threshold from QQ plots" << endl;
-	string qq_slope = DATA_DIR+DEM_ID+"_qq_slope.txt";
-	float slope_threshold_from_qq = Slope_new.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
+		cout << "Getting slope threshold from QQ plots" << endl;
+		string qq_slope = DATA_DIR+DEM_ID+"_qq_slope.txt";
+		slope_threshold = Slope_new.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
+	}
 
-	cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
+	cout << "Relief threshold: " << relief_threshold << " Slope threshold: " << slope_threshold << endl;
 
 	// get the terrace pixels
-	LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_int_map["Min terrace height"]);
+	LSDTerrace Terraces(SwathRaster, Slope_new, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, this_int_map["Min patch size"], this_int_map["Threshold_SO"], this_int_map["Min terrace height"]);
 	LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
 	string CC_ext = "_terrace_IDs";
 	ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
-
-	// cout << "\t Testing connected components" << endl;
-	// vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
-	//
-	// // push back results to file for plotting
-	// ofstream output_file_CC;
-	// string output_fname = "_terrace_swath_plots.txt";
-	// output_file_CC.open((DATA_DIR+DEM_ID+output_fname).c_str());
-	// for (int i = 0; i < int(CC_vector[0].size()); ++i)
-	// {
-	// 	output_file_CC << CC_vector[0][i] << " " << CC_vector[1][i] << " " << CC_vector[2][i] << endl;
-	// }
-	// output_file_CC.close();
 
 	// write raster of terrace elevations
 	LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
