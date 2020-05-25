@@ -231,16 +231,19 @@ int main (int nNumberofArgs,char *argv[])
 	string CC_ext = "_terrace_IDs";
 	ConnectedComponents.write_raster((DATA_DIR+DEM_ID+CC_ext), DEM_extension);
 
-	// write raster of terrace elevations
-	LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
-	string relief_ext = "_terrace_relief_final";
-	ChannelRelief.write_raster((DATA_DIR+DEM_ID+relief_ext), DEM_extension);
-
-	// print the terrace information to a csv
-	string csv_fname = "_terrace_info.csv";
-	string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
-	cout << "The full csv filename is: " << full_csv_name << endl;
-	Terraces.print_TerraceInfo_to_csv(full_csv_name, ElevationRaster, FlowInfo, TestSwath);
+	 // print the terrace information to a csv
+	 string csv_fname = "_terrace_info";
+	 string full_csv_name = DATA_DIR+DEM_ID+csv_fname+".csv";
+	 cout << "The full csv filename is: " << full_csv_name << endl;
+	 Terraces.print_TerraceInfo_to_csv(full_csv_name, RasterTemplate, SwathRaster, FlowInfo, TestSwath);
+                                                                                                                              // print the information about the baseline channel to csv                                                           
+         string channel_csv_fname = "_baseline_channel_info.csv";
+ 	 cout << "The channel csv filename is" << DATA_DIR+DEM_ID+channel_csv_fname << endl;
+	 TestSwath.print_baseline_to_csv(RasterTemplate, DATA_DIR+DEM_ID+channel_csv_fname, FlowInfo, DistanceFromOutlet);
+	                                                                                                                      // write raster of terrace elevations
+	 LSDRaster ChannelRelief = Terraces.get_Terraces_RasterValues(SwathRaster);
+	 string relief_ext = "_terrace_relief_final";
+	 ChannelRelief.write_raster((DATA_DIR+DEM_ID+relief_ext), DEM_extension);
 
 	// Done, check how long it took
 	clock_t end = clock();
