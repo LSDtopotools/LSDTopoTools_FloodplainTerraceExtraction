@@ -45,11 +45,11 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| Fiona J. Clubb												              ||" << endl;
   cout << "|| with minor housekeeping from Simon M Mudd						||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
-  cout << "=========================================================" << endl;   
-  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "=========================================================" << endl;
+  cout << "|| If you use these routines please cite:              ||" << endl;
   cout << "|| https://www.doi.org/10.5281/zenodo.824204           ||" << endl;
-  cout << "|| And                                                 ||" << endl;   
-  cout << "|| https://www.earth-surf-dynam.net/5/369/2017/        ||" << endl;  
+  cout << "|| And                                                 ||" << endl;
+  cout << "|| https://www.earth-surf-dynam.net/5/369/2017/        ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -82,6 +82,11 @@ int main (int nNumberofArgs,char *argv[])
 
 	// set default bool parameters
 	bool_default_map["Filter topography"] = true;
+
+	// parameters for using absolute thresholds if you want to
+	bool_default_map["use_absolute_thresholds"] = false;
+	int_default_map["Relief threshold"] = 50;
+	float_default_map["Slope threshold"] = 0.2;
 
 	// Use the parameter parser to get the maps of the parameters required for the
 	// analysis
@@ -177,23 +182,31 @@ int main (int nNumberofArgs,char *argv[])
   string slope_name = "_slope";
   Slope.write_raster((DATA_DIR+DEM_ID+slope_name), DEM_extension);
 
-  // get the channel relief and slope threshold using quantile-quantile plots
-  cout << "Getting channel relief threshold from QQ plots" << endl;
-  string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
-  float relief_threshold_from_qq = ChannelRelief.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
+  float relief_threshold, slope_threshold;
+	if(this_bool_map["use_absolute_thresholds"])
+  {
+	  relief_threshold = this_int_map["Relief threshold"];
+		slope_threshold = this_float_map["Slope threshold"];
+	}
+	else
+	{
+  	// get the channel relief and slope threshold using quantile-quantile plots
+  	cout << "Getting channel relief threshold from QQ plots" << endl;
+  	string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
+  	relief_threshold = ChannelRelief.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ threshold"], this_int_map["Relief lower percentile"], this_int_map["Relief upper percentile"]);
 
-  cout << "Getting slope threshold from QQ plots" << endl;
-  string qq_slope = path_name+DEM_ID+"_qq_slope.txt";
-  float slope_threshold_from_qq = Slope.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
-
-	cout << "Relief threshold: " << relief_threshold_from_qq << " Slope threshold: " << slope_threshold_from_qq << endl;
+  	cout << "Getting slope threshold from QQ plots" << endl;
+  	string qq_slope = path_name+DEM_ID+"_qq_slope.txt";
+  	slope_threshold = Slope.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ threshold"], this_int_map["Slope lower percentile"], this_int_map["Slope upper percentile"]);
+  }
+	cout << "Relief threshold: " << relief_threshold << " Slope threshold: " << slope_threshold << endl;
 
 	// get the distance from outlet
 	LSDRaster DistFromOutlet = FlowInfo.distance_from_outlet();
 
 	// get the floodplain object
 	cout << "Getting the floodplain object" << endl;
-	LSDFloodplain Floodplain(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold_from_qq, slope_threshold_from_qq, this_int_map["Min patch size"], this_int_map["Threshold_SO"]);
+	LSDFloodplain Floodplain(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, this_int_map["Min patch size"], this_int_map["Threshold_SO"]);
 
 	//print connected components
 	LSDIndexRaster CC = Floodplain.print_ConnectedComponents_to_Raster();
