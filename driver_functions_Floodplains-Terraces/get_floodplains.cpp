@@ -74,6 +74,7 @@ int main (int nNumberofArgs,char *argv[])
 	int_default_map["Slope lower percentile"] = 25;
 	int_default_map["Slope upper percentile"] = 75;
 	int_default_map["Min patch size"] = 1000;
+	int_default_map["Chan area threshold"] = 1000;
 
 	// set default float parameters
 	float_default_map["surface_fitting_window_radius"] = 6;
@@ -149,14 +150,36 @@ int main (int nNumberofArgs,char *argv[])
   }
 
 
-  cout << "\t Flow routing..." << endl;
+	cout << "\t Flow routing..." << endl;
 	// get a flow info object
- 	LSDFlowInfo FlowInfo(boundary_conditions,filled_topo_test);
+	LSDFlowInfo FlowInfo(boundary_conditions, filled_topo_test);
+	// calcualte the distance from outlet
+	LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
-	cout << "\t Loading Sources..." << endl;
+	// calculate the flow accumulation
+	cout << "\t Calculating flow accumulation (in pixels)..." << endl;
+	LSDIndexRaster FlowAcc = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+	int threshold_contributing_pixels = this_int_map["Chan area threshold"];
+
+	// some error checking
 	// load the sources
-	vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 2);
-	cout << "\t Got sources!" << endl;
+  vector<int> sources;
+  if (CHeads_file == "NULL" || CHeads_file == "Null" || CHeads_file == "null")
+  {
+    cout << endl << endl << endl << "==================================" << endl;
+    cout << "The channel head file is null. " << endl;
+    cout << "Getting sources from a threshold of "<< threshold_contributing_pixels << " pixels." <<endl;
+    sources = FlowInfo.get_sources_index_threshold(FlowAcc, threshold_contributing_pixels);
+
+    cout << "The number of sources is: " << sources.size() << endl;
+  }
+	else
+  {
+    cout << "Loading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
+    sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
+    cout << "\t Got sources!" << endl;
+  }
+
 
 	// now get the junction network
 	LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
