@@ -2836,7 +2836,9 @@ void LSDJunctionNetwork::write_valley_hilltop_chi_profiles_to_csv(vector<int> so
 		// get the LSDChannel
 		LSDChannel new_channel(hilltop_node, final_node, downslope_chi, m_over_n, A_0, FlowInfo, ElevationRaster);
 		// write to csv
-		string jn_str = static_cast<ostringstream*>( &(ostringstream() << source_junction) )->str();
+    std::ostringstream oss;
+    oss << source_junction;
+    std::string jn_str = oss.str();
 		string output_csv_filename = DEM_ID+"_chan_profile_"+jn_str;
 		new_channel.write_channel_to_csv(output_path, output_csv_filename, FlowDistance);
 	}
